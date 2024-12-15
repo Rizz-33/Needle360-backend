@@ -10,31 +10,18 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
-
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
-
       - name: Build Docker Image
-        run: docker build -t rizz336/needle360-backend:${{ github.sha }} -t rizz336/needle360-backend:latest .
-
+        run: docker build -t rizz336/needle360-backend .
       - name: Push Docker Image
-        run: |
-          docker push rizz336/needle360-backend:${{ github.sha }}
-          docker push rizz336/needle360-backend:latest
+        run: docker push rizz336/needle360-backend:latest
 
   deploy:
     needs: build
     runs-on: self-hosted
     steps:
-      - name: Stop Existing Container
-        run: |
-          docker stop needle360-backend-container || true
-          docker rm needle360-backend-container || true
-
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
-
       - name: Run Docker Container
-        run: |
-          docker run -d -p 4000:4000 --name needle360-backend-container \
-          --env-file .env rizz336/needle360-backend:latest
+        run: docker run -d -p 4000:4000 --name needle360-backend-container -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' rizz336/needle360-backend
