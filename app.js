@@ -15,5 +15,5 @@ connectToMongoDB()
     });
   })
   .catch((error) => {
-    console.error("Failed to connect to MongoDB. Server not started.");
+    console.error("Failed to connect to the MongoDB. Server not started.");
   });
