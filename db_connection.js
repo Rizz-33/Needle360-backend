@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { MongoClient } = require('mongodb');
 
-const password = encodeURIComponent(process.env.MONGODB_PASSWORD.trim());
+const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 const connectionString = `mongodb+srv://risiniamarathunga:${password}@devcluster.4xxln.mongodb.net/?retryWrites=true&w=majority&appName=DevCluster`;
 
 const client = new MongoClient(connectionString);
