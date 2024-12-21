@@ -34,4 +34,4 @@ jobs:
         run: docker rm needle360-backend-container || true
 
       - name: Run Docker Container
-        run: docker run -d -p 4000:4000 --name needle360-backend-container -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' rizz336/needle360-backend:latest
+        run: docker run -d -p 4003:4003 --name needle360-backend-container -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' rizz336/needle360-backend:latest

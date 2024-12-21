@@ -2,7 +2,7 @@ const express = require("express");
 const connectToMongoDB = require("./db_connection");
 
 const app = express();
-const port = 4000;
+const port = 4003;
 
 connectToMongoDB()
   .then((db) => {
