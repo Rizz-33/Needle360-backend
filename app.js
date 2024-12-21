@@ -5,6 +5,8 @@ import authRoutes from "./routes/auth.route.js";
 const app = express();
 const port = process.env.PORT || 5000;
 
+app.use(express.json());
+
 connectToMongoDB()
   .then((db) => {
     app.get("/", (req, res) => {
