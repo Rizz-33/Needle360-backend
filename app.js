@@ -1,5 +1,5 @@
-const express = require("express");
-const connectToMongoDB = require("./db_connection");
+import express from "express";
+import { connectToMongoDB } from './db_connection.js';
 
 const app = express();
 const port = 4003;
