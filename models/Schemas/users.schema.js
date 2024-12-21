@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
-import BaseUser from "../user.model";
+import ROLES from "../../constants.js";
+import BaseUser from "../base-user.model.js";
 
 const userSchema = new mongoose.Schema({
   role: {
     type: String,
-    default: "user",
+    default: ROLES.USER,
     required: true,
   },
   contactNumber: {
@@ -27,8 +28,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  privileges: {
+    type: [String],
+    default: [],
+  },
 });
 
-const User = BaseUser.discriminator("users", userSchema);
+const User = BaseUser.discriminator("User", userSchema);
 
 export default User;

@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
-import BaseUser from "../user.model";
+import ROLES from "../../constants.js";
+import BaseUser from "../base-user.model.js";
 
 const adminSchema = new mongoose.Schema({
   role: {
     type: String,
-    default: "admin",
+    default: ROLES.ADMIN,
     required: true,
   },
   privileges: {
@@ -13,6 +14,6 @@ const adminSchema = new mongoose.Schema({
   },
 });
 
-const Admin = BaseUser.discriminator("admin", adminSchema);
+const Admin = BaseUser.discriminator("Admin", adminSchema);
 
 export default Admin;

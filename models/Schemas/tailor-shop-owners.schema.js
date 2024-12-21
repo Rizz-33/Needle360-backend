@@ -1,10 +1,11 @@
 import mongoose from "mongoose";
-import BaseUser from "../user.model";
+import ROLES from "../../constants.js";
+import BaseUser from "../base-user.model.js";
 
 const tailorShopOwnerSchema = new mongoose.Schema({
   role: {
     type: String,
-    default: "tailor-shop-owner",
+    default: ROLES.TAILOR_SHOP_OWNER,
     required: true,
   },
   shopName: {
@@ -23,10 +24,14 @@ const tailorShopOwnerSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  privileges: {
+    type: [String],
+    default: [],
+  },
 });
 
 const TailorShopOwner = BaseUser.discriminator(
-  "tailor-shop=owners",
+  "TailorShopOwner",
   tailorShopOwnerSchema
 );
 
