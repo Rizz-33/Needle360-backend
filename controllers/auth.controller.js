@@ -1,26 +1,63 @@
 import bcryptjs from "bcryptjs";
-import Admin from "../models/Admin";
-import TailorShopOwner from "../models/TailorShopOwner";
-import User from "../models/User";
+import ROLES from "../constants.js";
+import Admin from "../models/Schemas/admin.schema.js";
+import TailorShopOwner from "../models/Schemas/tailor-shop-owners.schema.js";
+import User from "../models/Schemas/users.schema.js";
+import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 export const signup = async (req, res) => {
-  const { email, password, name, role } = req.body;
+  const {
+    email,
+    password,
+    name,
+    role,
+    contactNumber,
+    address,
+    bankAccountNumber,
+    bankName,
+    bankBranch,
+    shopName,
+    shopAddress,
+    shopRegistrationNumber,
+  } = req.body;
 
+  // Check for missing fields
   if (!email || !password || !name || !role) {
     return res.status(400).send({ message: "Missing required fields." });
+  }
+
+  if (
+    role === ROLES.TAILOR_SHOP_OWNER &&
+    (!contactNumber || !shopName || !shopAddress || !shopRegistrationNumber)
+  ) {
+    return res
+      .status(400)
+      .send({ message: "Missing fields for tailor shop owner." });
+  }
+
+  if (
+    role === ROLES.USER &&
+    (!contactNumber ||
+      !address ||
+      !bankAccountNumber ||
+      !bankName ||
+      !bankBranch)
+  ) {
+    return res.status(400).send({ message: "Missing fields for user." });
   }
 
   try {
     let existingUser;
 
+    // Check if the user already exists in the database
     switch (role) {
-      case "admin":
+      case ROLES.ADMIN:
         existingUser = await Admin.findOne({ email });
         break;
-      case "tailor-shop-owner":
+      case ROLES.TAILOR_SHOP_OWNER:
         existingUser = await TailorShopOwner.findOne({ email });
         break;
-      case "user":
+      case ROLES.USER:
         existingUser = await User.findOne({ email });
         break;
       default:
@@ -31,15 +68,14 @@ export const signup = async (req, res) => {
       return res.status(400).send({ message: "User already exists." });
     }
 
-    let user;
-
     const hashedPassword = await bcryptjs.hash(password, 12);
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
 
+    let user;
     switch (role) {
-      case "admin":
+      case ROLES.ADMIN:
         user = new Admin({
           email,
           password: hashedPassword,
@@ -48,7 +84,7 @@ export const signup = async (req, res) => {
           verificationTokenExpires: Date.now() + 3600000, // 1 hour
         });
         break;
-      case "tailor-shop-owner":
+      case ROLES.TAILOR_SHOP_OWNER:
         user = new TailorShopOwner({
           email,
           password: hashedPassword,
@@ -61,7 +97,7 @@ export const signup = async (req, res) => {
           verificationTokenExpires: Date.now() + 3600000, // 1 hour
         });
         break;
-      case "user":
+      case ROLES.USER:
         user = new User({
           email,
           password: hashedPassword,
