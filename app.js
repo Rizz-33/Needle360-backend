@@ -3,7 +3,7 @@ import { connectToMongoDB } from "./db_connection.js";
 import authRoutes from "./routes/auth.route.js";
 
 const app = express();
-const port = 4003;
+const port = process.env.PORT || 5000;
 
 connectToMongoDB()
   .then((db) => {
