@@ -33,6 +33,7 @@ const baseUserSchema = new mongoose.Schema(
   {
     timestamps: true,
     collection: "users",
+  discriminatorKey: 'role',
   }
 );
 
