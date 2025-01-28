@@ -5,7 +5,7 @@ dotenv.config();
 
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
 
-const connectionString = `mongodb+srv://risiniamarathunga:${password}@devcluster.4xxln.mongodb.net/?retryWrites=true&w=majority&appName=DevCluster`;
+const connectionString = `mongodb+srv://risiniamarathunga:${password}@devcluster.4xxln.mongodb.net/database?retryWrites=true&w=majority&appName=DevCluster`;
 
 mongoose.connection.on("connected", () => {
   console.log("MongoDB connected");
