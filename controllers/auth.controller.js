@@ -1,8 +1,6 @@
 import bcryptjs from "bcryptjs";
+import mongoose from "mongoose";
 import ROLES from "../constants.js";
-import Admin from "../models/Schemas/admin.schema.js";
-import TailorShopOwner from "../models/Schemas/tailor-shop-owners.schema.js";
-import User from "../models/Schemas/users.schema.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 export const signup = async (req, res) => {
@@ -26,104 +24,97 @@ export const signup = async (req, res) => {
     return res.status(400).send({ message: "Missing required fields." });
   }
 
-  if (
-    role === ROLES.TAILOR_SHOP_OWNER &&
-    (!contactNumber || !shopName || !shopAddress || !shopRegistrationNumber)
-  ) {
-    return res
-      .status(400)
-      .send({ message: "Missing fields for tailor shop owner." });
-  }
+  // Validate role-specific fields
+  const validateFields = (role) => {
+    const missingFields = [];
+    switch (role) {
+      case ROLES.TAILOR_SHOP_OWNER:
+        [
+          "contactNumber",
+          "shopName",
+          "shopAddress",
+          "shopRegistrationNumber",
+        ].forEach((field) => {
+          if (!req.body[field]) missingFields.push(field);
+        });
+        break;
+      case ROLES.USER:
+        [
+          "contactNumber",
+          "address",
+          "bankAccountNumber",
+          "bankName",
+          "bankBranch",
+        ].forEach((field) => {
+          if (!req.body[field]) missingFields.push(field);
+        });
+        break;
+      case ROLES.ADMIN:
+        break;
+      default:
+        return "Invalid role";
+    }
+    return missingFields;
+  };
 
-  if (
-    role === ROLES.USER &&
-    (!contactNumber ||
-      !address ||
-      !bankAccountNumber ||
-      !bankName ||
-      !bankBranch)
-  ) {
-    return res.status(400).send({ message: "Missing fields for user." });
+  const missingFields = validateFields(role);
+  if (missingFields.length > 0) {
+    return res.status(400).send({
+      message: `Missing required fields: ${missingFields.join(", ")}`,
+    });
   }
 
   try {
-    let existingUser;
+    const db = mongoose.connection.db;
 
-    // Check if the user already exists in the database
-    switch (role) {
-      case ROLES.ADMIN:
-        existingUser = await Admin.findOne({ email });
-        break;
-      case ROLES.TAILOR_SHOP_OWNER:
-        existingUser = await TailorShopOwner.findOne({ email });
-        break;
-      case ROLES.USER:
-        existingUser = await User.findOne({ email });
-        break;
-      default:
-        return res.status(400).send({ message: "Invalid role" });
-    }
-
+    // Check if the user already exists
+    const existingUser = await db.collection("users").findOne({ email });
     if (existingUser) {
       return res.status(400).send({ message: "User already exists." });
     }
 
+    // Hash password and prepare user data
     const hashedPassword = await bcryptjs.hash(password, 12);
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
+    const verificationTokenExpires = Date.now() + 3600000; // 1 hour
 
-    let user;
-    switch (role) {
-      case ROLES.ADMIN:
-        user = new Admin({
-          email,
-          password: hashedPassword,
-          name,
-          verificationToken,
-          verificationTokenExpires: Date.now() + 3600000, // 1 hour
-        });
-        break;
-      case ROLES.TAILOR_SHOP_OWNER:
-        user = new TailorShopOwner({
-          email,
-          password: hashedPassword,
-          name,
-          contactNumber,
-          shopName,
-          shopAddress,
-          shopRegistrationNumber,
-          verificationToken,
-          verificationTokenExpires: Date.now() + 3600000, // 1 hour
-        });
-        break;
-      case ROLES.USER:
-        user = new User({
-          email,
-          password: hashedPassword,
-          name,
-          contactNumber,
-          address,
-          bankAccountNumber,
-          bankName,
-          bankBranch,
-          verificationToken,
-          verificationTokenExpires: Date.now() + 3600000, // 1 hour
-        });
-        break;
-      default:
-        return res.status(400).send({ message: "Invalid role" });
-    }
+    // Prepare the user object based on role
+    const user = {
+      email,
+      password: hashedPassword,
+      name,
+      role,
+      verificationToken,
+      verificationTokenExpires,
+      ...(role === ROLES.TAILOR_SHOP_OWNER && {
+        contactNumber,
+        shopName,
+        shopAddress,
+        shopRegistrationNumber,
+      }),
+      ...(role === ROLES.USER && {
+        contactNumber,
+        address,
+        bankAccountNumber,
+        bankName,
+        bankBranch,
+      }),
+    };
 
-    await user.save();
+    // Insert the user into the collection
+    const result = await db.collection("users").insertOne(user);
 
-    generateTokenAndSetCookie(res, user._id);
+    // Generate token and set cookie
+    generateTokenAndSetCookie(res, result.insertedId);
 
     res.status(201).send({
       message: "User created successfully!",
       user: {
-        ...user._doc,
-        password: null,
+        ...user,
+        password: null, // Exclude password in the response
+        _id: result.insertedId,
       },
     });
   } catch (error) {
@@ -134,8 +125,46 @@ export const signup = async (req, res) => {
 };
 
 export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).send({ message: "Missing email or password." });
+  }
+
   try {
-    res.send("Login route");
+    const db = mongoose.connection.db;
+
+    // Check if the user exists
+    const user = await db.collection("users").findOne({ email });
+    if (!user) {
+      return res.status(400).send({ message: "Invalid email or password." });
+    }
+
+    // Check if the password is correct
+    const isPasswordValid = await bcryptjs.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).send({ message: "Invalid email or password." });
+    }
+
+    // Generate token and set cookie
+    generateTokenAndSetCookie(res, user._id);
+
+    res.status(200).send({
+      message: "Successfully logged in!",
+      user: {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        contactNumber: user.contactNumber,
+        address: user.address,
+        bankAccountNumber: user.bankAccountNumber,
+        bankName: user.bankName,
+        bankBranch: user.bankBranch,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopRegistrationNumber: user.shopRegistrationNumber,
+      },
+    });
   } catch (error) {
     res
       .status(500)
@@ -145,7 +174,9 @@ export const login = async (req, res) => {
 
 export const logout = async (req, res) => {
   try {
-    res.send("Logout route");
+    // Clear the authentication cookie
+    res.clearCookie("token");
+    res.status(200).send({ message: "Successfully logged out!" });
   } catch (error) {
     res
       .status(500)
