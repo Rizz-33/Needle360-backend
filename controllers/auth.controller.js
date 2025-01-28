@@ -1,6 +1,7 @@
 import bcryptjs from "bcryptjs";
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 export const signup = async (req, res) => {
@@ -109,6 +110,8 @@ export const signup = async (req, res) => {
     // Generate token and set cookie
     generateTokenAndSetCookie(res, result.insertedId);
 
+    await sendVerificationEmail(user.email, verificationToken);
+
     res.status(201).send({
       message: "User created successfully!",
       user: {
@@ -121,6 +124,46 @@ export const signup = async (req, res) => {
     res
       .status(500)
       .send({ message: "Error during signup", error: error.message });
+  }
+};
+
+export const verifyEmail = async (req, res) => {
+  const { code } = req.body;
+
+  try {
+    const db = mongoose.connection.db;
+    const user = await db.collection("users").findOne({
+      verificationToken: code,
+      verificationTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res
+        .status(400)
+        .send({ message: "Invalid or expired verification code." });
+    }
+
+    // Update user details
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpires = undefined;
+
+    // Save changes
+    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
+
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.name);
+
+    res.status(200).json({
+      message: "Email verified successfully!",
+      user: {
+        ...user,
+        password: undefined,
+      },
+    });
+  } catch (error) {
+    res.status(500).send({ message: "Internal server error." });
+    console.error(error);
   }
 };
 
