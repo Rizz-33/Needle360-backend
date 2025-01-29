@@ -1,7 +1,12 @@
 import bcryptjs from "bcryptjs";
+import crypto from "crypto";
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
-import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
+import {
+  sendPasswordResetEmail,
+  sendVerificationEmail,
+  sendWelcomeEmail,
+} from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 export const signup = async (req, res) => {
@@ -224,5 +229,40 @@ export const logout = async (req, res) => {
     res
       .status(500)
       .send({ message: "Error during logout", error: error.message });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  const db = mongoose.connection.db;
+
+  try {
+    const user = await db.collection("users").findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "User not found." });
+    }
+
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(20).toString("hex");
+    const resetTokenExpires = Date.now() + 3600000; // 1 hour
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetTokenExpires;
+
+    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
+
+    // Send password reset email
+    await sendPasswordResetEmail(
+      user.email,
+      `${process.env.CLIENT_URL}/reset-password/${resetToken}`
+    );
+    console.log("Password reset email sent successfully.");
+    res
+      .status(200)
+      .json({ message: "Password reset email sent successfully." });
+  } catch (error) {
+    console.error("Error during password reset:", error.message);
+    res.status(500).json({ message: "Error during password reset." });
   }
 };
