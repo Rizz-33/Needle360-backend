@@ -1,4 +1,5 @@
 import {
+  PASSWORD_RESET_REQUEST_TEMPLATE,
   VERIFICATION_EMAIL_TEMPLATE,
   WELCOME_EMAIL_TEMPLATE,
 } from "./emailTemplates.js";
@@ -58,5 +59,33 @@ export const sendWelcomeEmail = async (email, name) => {
     console.error(`Failed to send welcome email to ${email}: ${error.message}`);
 
     throw new Error(`Failed to send welcome email: ${error.message}`);
+  }
+};
+
+export const sendPasswordResetEmail = async (email, resetURL) => {
+  const recipient = [
+    {
+      email,
+    },
+  ];
+
+  try {
+    const response = await mailtrapClient.send({
+      from: sender,
+      to: recipient,
+      subject: "Please reset your password",
+      html: PASSWORD_RESET_REQUEST_TEMPLATE.replace("{resetURL}", resetURL),
+      category: "Password Reset",
+    });
+
+    console.log(
+      `Password reset email sent successfully to ${email}. Response ID: ${response.id}`
+    );
+  } catch (error) {
+    console.error(
+      `Failed to send password reset email to ${email}: ${error.message}`
+    );
+
+    throw new Error(`Failed to send password reset email: ${error.message}`);
   }
 };
