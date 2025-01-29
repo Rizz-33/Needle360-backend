@@ -302,3 +302,26 @@ export const resetPassword = async (req, res) => {
     res.status(500).json({ message: "Error during password reset." });
   }
 };
+
+export const checkAuth = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const user = await db
+      .collection("users")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(req.userId) },
+        { projection: { password: 0 } }
+      );
+
+    if (!user) {
+      return res.status(401).send({ message: "User not found." });
+    }
+
+    res.status(200).json({
+      user,
+    });
+  } catch (error) {
+    console.log("Error checking authentication:", error.message);
+    res.status(500).send({ message: "Error checking authentication." });
+  }
+};
