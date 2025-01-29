@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import express from "express";
 import { connectToMongoDB } from "./db_connection.js";
 import authRoutes from "./routes/auth.route.js";
@@ -5,7 +6,8 @@ import authRoutes from "./routes/auth.route.js";
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(express.json());
+app.use(express.json()); // Body parser
+app.use(cookieParser()); // Cookie parser
 
 connectToMongoDB()
   .then((db) => {
