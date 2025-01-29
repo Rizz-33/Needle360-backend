@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import ROLES from "../constants.js";
 import {
   sendPasswordResetEmail,
+  sendResetPasswordConfirmationEmail,
   sendVerificationEmail,
   sendWelcomeEmail,
 } from "../mailtrap/emails.js";
@@ -261,6 +262,41 @@ export const forgotPassword = async (req, res) => {
     res
       .status(200)
       .json({ message: "Password reset email sent successfully." });
+  } catch (error) {
+    console.error("Error during password reset:", error.message);
+    res.status(500).json({ message: "Error during password reset." });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  const { password } = req.body;
+  const { token } = req.params;
+  const db = mongoose.connection.db;
+
+  try {
+    const user = await db.collection("users").findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token." });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcryptjs.hash(password, 12);
+
+    // Update user details
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+
+    // Save changes
+    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
+
+    sendResetPasswordConfirmationEmail(user.email);
+
+    res.status(200).json({ message: "Password reset successful." });
   } catch (error) {
     console.error("Error during password reset:", error.message);
     res.status(500).json({ message: "Error during password reset." });
