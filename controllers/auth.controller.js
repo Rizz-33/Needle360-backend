@@ -219,7 +219,7 @@ export const logout = async (req, res) => {
   try {
     // Clear the authentication cookie
     res.clearCookie("token");
-    res.status(200).send({ message: "Successfully logged out!" });
+    res.status(200).json({ message: "Successfully logged out!" });
   } catch (error) {
     res
       .status(500)
