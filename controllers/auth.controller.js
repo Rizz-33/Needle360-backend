@@ -1,5 +1,6 @@
 import bcryptjs from "bcryptjs";
 import crypto from "crypto";
+import { console } from "inspector";
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
 import {
@@ -20,20 +21,26 @@ export const signup = async (req, res) => {
     address,
     bankAccountNumber,
     bankName,
-    bankBranch,
     shopName,
     shopAddress,
     shopRegistrationNumber,
   } = req.body;
 
   // Check for missing fields
-  if (!email || !password || !name || !role) {
+  if (!email || !password || !name) {
     return res.status(400).send({ message: "Missing required fields." });
   }
 
   // Validate role-specific fields
+  // Change the validateFields function to always return an array
   const validateFields = (role) => {
     const missingFields = [];
+
+    // First check if role is valid
+    if (![ROLES.TAILOR_SHOP_OWNER, ROLES.USER, ROLES.ADMIN].includes(role)) {
+      return ["Invalid role"];
+    }
+
     switch (role) {
       case ROLES.TAILOR_SHOP_OWNER:
         [
@@ -51,15 +58,12 @@ export const signup = async (req, res) => {
           "address",
           "bankAccountNumber",
           "bankName",
-          "bankBranch",
         ].forEach((field) => {
           if (!req.body[field]) missingFields.push(field);
         });
         break;
       case ROLES.ADMIN:
         break;
-      default:
-        return "Invalid role";
     }
     return missingFields;
   };
@@ -71,6 +75,7 @@ export const signup = async (req, res) => {
     });
   }
 
+  console.log("All fields are present.");
   try {
     const db = mongoose.connection.db;
 
@@ -106,7 +111,6 @@ export const signup = async (req, res) => {
         address,
         bankAccountNumber,
         bankName,
-        bankBranch,
       }),
     };
 
@@ -208,7 +212,6 @@ export const login = async (req, res) => {
         address: user.address,
         bankAccountNumber: user.bankAccountNumber,
         bankName: user.bankName,
-        bankBranch: user.bankBranch,
         shopName: user.shopName,
         shopAddress: user.shopAddress,
         shopRegistrationNumber: user.shopRegistrationNumber,
