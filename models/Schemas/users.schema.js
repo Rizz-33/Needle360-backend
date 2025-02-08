@@ -25,10 +25,6 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    bankBranch: {
-      type: String,
-      required: true,
-    },
     privileges: {
       type: [String],
       default: [],
