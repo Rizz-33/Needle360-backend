@@ -53,14 +53,11 @@ export const signup = async (req, res) => {
         });
         break;
       case ROLES.USER:
-        [
-          "contactNumber",
-          "address",
-          "bankAccountNumber",
-          "bankName",
-        ].forEach((field) => {
-          if (!req.body[field]) missingFields.push(field);
-        });
+        ["contactNumber", "address", "bankAccountNumber", "bankName"].forEach(
+          (field) => {
+            if (!req.body[field]) missingFields.push(field);
+          }
+        );
         break;
       case ROLES.ADMIN:
         break;
@@ -237,13 +234,20 @@ export const logout = async (req, res) => {
 };
 
 export const forgotPassword = async (req, res) => {
-  const { email } = req.body;
+  // Access the email properly
+  const email = req.body.email.email;
   const db = mongoose.connection.db;
 
+  console.log("Received email:", email); // Log the incoming email
+
   try {
-    const user = await db.collection("users").findOne({ email });
+    // Case-insensitive query
+    const user = await db
+      .collection("users")
+      .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
     if (!user) {
+      console.log("User not found with email:", email); // Log if no user is found
       return res.status(400).json({ message: "User not found." });
     }
 
