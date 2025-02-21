@@ -17,7 +17,7 @@ const baseUserSchema = new mongoose.Schema(
       required: true,
     },
     role: {
-      type: String,
+      type: Number,
       required: true,
       enum: [ROLES.ADMIN, ROLES.TAILOR_SHOP_OWNER, ROLES.USER],
     },
@@ -33,7 +33,7 @@ const baseUserSchema = new mongoose.Schema(
   {
     timestamps: true,
     collection: "users",
-  discriminatorKey: 'role',
+    discriminatorKey: "role",
   }
 );
 

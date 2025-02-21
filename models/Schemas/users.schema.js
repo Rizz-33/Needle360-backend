@@ -4,11 +4,6 @@ import BaseUser from "../base-user.model.js";
 
 const userSchema = new mongoose.Schema(
   {
-    role: {
-      type: String,
-      default: ROLES.USER,
-      required: true,
-    },
     contactNumber: {
       type: String,
       required: true,
