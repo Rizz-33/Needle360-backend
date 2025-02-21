@@ -19,20 +19,20 @@ export const signup = async (req, res) => {
     role,
     contactNumber,
     address,
-    bankAccountNumber,
-    bankName,
     shopName,
     shopAddress,
     shopRegistrationNumber,
+    logoUrl,
+    bankAccountNumber,
+    bankName,
   } = req.body;
 
   // Check for missing fields
-  if (!email || !password || !name) {
+  if (!email || !password || !name || !role) {
     return res.status(400).send({ message: "Missing required fields." });
   }
 
   // Validate role-specific fields
-  // Change the validateFields function to always return an array
   const validateFields = (role) => {
     const missingFields = [];
 
@@ -48,6 +48,9 @@ export const signup = async (req, res) => {
           "shopName",
           "shopAddress",
           "shopRegistrationNumber",
+          "bankAccountNumber",
+          "bankName",
+          "logoUrl",
         ].forEach((field) => {
           if (!req.body[field]) missingFields.push(field);
         });
@@ -102,6 +105,9 @@ export const signup = async (req, res) => {
         shopName,
         shopAddress,
         shopRegistrationNumber,
+        logoUrl,
+        bankAccountNumber,
+        bankName,
       }),
       ...(role === ROLES.USER && {
         contactNumber,
@@ -115,7 +121,7 @@ export const signup = async (req, res) => {
     const result = await db.collection("users").insertOne(user);
 
     // Generate token and set cookie
-    generateTokenAndSetCookie(res, result.insertedId);
+    generateTokenAndSetCookie(res, user._id);
 
     await sendVerificationEmail(user.email, verificationToken);
 
@@ -123,7 +129,7 @@ export const signup = async (req, res) => {
       message: "User created successfully!",
       user: {
         ...user,
-        password: null, // Exclude password in the response
+        password: null,
         _id: result.insertedId,
       },
     });
