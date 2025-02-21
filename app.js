@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { connectToMongoDB } from "./db_connection.js";
 import authRoutes from "./routes/auth.route.js";
+import tailorRoutes from "./routes/tailor.route.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -19,6 +20,7 @@ connectToMongoDB()
     });
 
     app.use("/api/auth", authRoutes);
+    app.use("/api/tailor", tailorRoutes);
 
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
