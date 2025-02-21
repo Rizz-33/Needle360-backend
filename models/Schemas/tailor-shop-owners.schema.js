@@ -4,11 +4,6 @@ import BaseUser from "../base-user.model.js";
 
 const tailorShopOwnerSchema = new mongoose.Schema(
   {
-    role: {
-      type: String,
-      default: ROLES.TAILOR_SHOP_OWNER,
-      required: true,
-    },
     shopName: {
       type: String,
       required: true,
@@ -30,6 +25,10 @@ const tailorShopOwnerSchema = new mongoose.Schema(
       required: true,
     },
     bankName: {
+      type: String,
+      required: true,
+    },
+    logoUrl: {
       type: String,
       required: true,
     },
