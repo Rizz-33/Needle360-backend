@@ -92,12 +92,16 @@ export const signup = async (req, res) => {
     ).toString();
     const verificationTokenExpires = Date.now() + 3600000; // 1 hour
 
+    // Determine isApproved based on role
+    const isApproved = role === ROLES.USER;
+
     // Prepare the user object based on role
     const user = {
       email,
       password: hashedPassword,
       name,
       role,
+      isApproved,
       verificationToken,
       verificationTokenExpires,
       ...(role === ROLES.TAILOR_SHOP_OWNER && {
