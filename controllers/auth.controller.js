@@ -93,7 +93,7 @@ export const signup = async (req, res) => {
     const verificationTokenExpires = Date.now() + 3600000; // 1 hour
 
     // Determine isApproved based on role
-    const isApproved = role === ROLES.USER;
+    const isApproved = role === ROLES.USER ? true : false; // Set isApproved here
 
     // Prepare the user object based on role
     const user = {
@@ -340,5 +340,33 @@ export const checkAuth = async (req, res) => {
   } catch (error) {
     console.log("Error checking authentication:", error.message);
     res.status(500).send({ message: "Error checking authentication." });
+  }
+};
+
+export const checkIsApproved = async (req, res) => {
+  const { userId } = req.params;
+
+  // Validate userId format if using MongoDB ObjectId
+  if (!mongoose.Types.ObjectId.isValid(userId)) {
+    return res.status(400).json({ message: "Invalid user ID" });
+  }
+
+  try {
+    const db = mongoose.connection.db;
+    const user = await db
+      .collection("users")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(userId) },
+        { projection: { isApproved: 1 } }
+      );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.status(200).json({ isApproved: user.isApproved || false });
+  } catch (error) {
+    console.error("Error fetching isApproved value:", error.message);
+    res.status(500).json({ message: "Error fetching isApproved value." });
   }
 };
