@@ -36,6 +36,74 @@ const tailorShopOwnerSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    bio: {
+      type: String,
+      default: "",
+    },
+    offers: {
+      type: [
+        {
+          title: String,
+          description: String,
+          image: String,
+        },
+      ],
+      default: [],
+    },
+    designs: {
+      type: [
+        {
+          title: String,
+          description: String,
+          image: String,
+        },
+      ],
+      default: [],
+    },
+    availability: {
+      type: [
+        {
+          day: String,
+          hours: String,
+        },
+      ],
+      default: [],
+    },
+    address: {
+      type: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String,
+        country: String,
+      },
+      default: {},
+    },
+    services: {
+      type: [
+        {
+          title: String,
+          description: String,
+          price: String,
+        },
+      ],
+      default: [],
+    },
+    reviews: {
+      type: [
+        {
+          clientId: mongoose.Schema.Types.ObjectId,
+          rating: Number,
+          comment: String,
+          date: Date,
+        },
+      ],
+      default: [],
+    },
+    ratings: {
+      type: Number,
+      default: 0,
+    },
   },
   { collection: `users.${ROLES.TAILOR_SHOP_OWNER}` }
 );
