@@ -1,13 +1,32 @@
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
 
+const validateLogoUrl = (url) => {
+  if (!url) return "/images/default-logo.png";
+
+  if (url.match(/^https?:\/\//)) {
+    return url;
+  }
+
+  if (url.startsWith("data:")) {
+    return url;
+  }
+
+  if (!url.startsWith("/")) {
+    return `/${url}`;
+  }
+
+  return url;
+};
+
 export const getAllTailors = async (req, res) => {
   try {
     const db = mongoose.connection.db;
     const tailors = await db
       .collection("users")
-      .find({ role: ROLES.TAILOR_SHOP_OWNER }) // Filter for tailor shop owners
+      .find({ role: ROLES.TAILOR_SHOP_OWNER })
       .project({
+        _id: 1,
         email: 1,
         name: 1,
         shopName: 1,
@@ -17,7 +36,12 @@ export const getAllTailors = async (req, res) => {
       })
       .toArray();
 
-    res.json(tailors); // Respond with the list of tailors
+    const sanitizedTailors = tailors.map((tailor) => ({
+      ...tailor,
+      logoUrl: validateLogoUrl(tailor.logoUrl),
+    }));
+
+    res.json(sanitizedTailors);
   } catch (error) {
     console.error("Error fetching tailors:", error);
     res
@@ -32,9 +56,10 @@ export const getTailorById = async (req, res) => {
     const db = mongoose.connection.db;
 
     const tailor = await db.collection("users").findOne(
-      { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER }, // Filter by ID and role
+      { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER },
       {
         projection: {
+          _id: 1,
           email: 1,
           name: 1,
           shopName: 1,
@@ -57,10 +82,15 @@ export const getTailorById = async (req, res) => {
     );
 
     if (!tailor) {
-      return res.status(404).json({ message: "Tailor not found" }); // Respond with 404 if tailor not found
+      return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.json(tailor); // Respond with the tailor data, including full address
+    const sanitizedTailor = {
+      ...tailor,
+      logoUrl: validateLogoUrl(tailor.logoUrl),
+    };
+
+    res.json(sanitizedTailor);
   } catch (error) {
     console.error("Error fetching tailor:", error);
     res
@@ -72,24 +102,30 @@ export const getTailorById = async (req, res) => {
 export const updateTailorById = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body; // New data sent in the request body
+    const updateData = { ...req.body };
+
+    if ("logoUrl" in updateData) {
+      updateData.logoUrl = validateLogoUrl(updateData.logoUrl);
+    }
 
     const db = mongoose.connection.db;
 
-    // Update the tailor's details
-    const result = await db.collection("users").updateOne(
-      { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER }, // Filter by ID and role
-      { $set: updateData }
-    );
+    const result = await db
+      .collection("users")
+      .updateOne(
+        { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER },
+        { $set: updateData }
+      );
 
     if (result.matchedCount === 0) {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Fetch the updated tailor profile
     const updatedTailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
     });
+
+    updatedTailor.logoUrl = validateLogoUrl(updatedTailor.logoUrl);
 
     res.json(updatedTailor);
   } catch (error) {
