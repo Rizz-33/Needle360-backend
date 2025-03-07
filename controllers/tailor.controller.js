@@ -30,6 +30,7 @@ export const getTailorById = async (req, res) => {
   try {
     const { id } = req.params;
     const db = mongoose.connection.db;
+
     const tailor = await db.collection("users").findOne(
       { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER }, // Filter by ID and role
       {
@@ -40,6 +41,17 @@ export const getTailorById = async (req, res) => {
           contactNumber: 1,
           logoUrl: 1,
           shopAddress: 1,
+          shopRegistrationNumber: 1,
+          bankAccountNumber: 1,
+          bankName: 1,
+          privileges: 1,
+          bio: 1,
+          offers: 1,
+          designs: 1,
+          availability: 1,
+          services: 1,
+          reviews: 1,
+          ratings: 1,
         },
       }
     );
@@ -48,7 +60,7 @@ export const getTailorById = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" }); // Respond with 404 if tailor not found
     }
 
-    res.json(tailor); // Respond with the tailor data
+    res.json(tailor); // Respond with the tailor data, including full address
   } catch (error) {
     console.error("Error fetching tailor:", error);
     res
