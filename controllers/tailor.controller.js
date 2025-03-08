@@ -1,24 +1,6 @@
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
 
-const validateLogoUrl = (url) => {
-  if (!url) return "/images/default-logo.png";
-
-  if (url.match(/^https?:\/\//)) {
-    return url;
-  }
-
-  if (url.startsWith("data:")) {
-    return url;
-  }
-
-  if (!url.startsWith("/")) {
-    return `/${url}`;
-  }
-
-  return url;
-};
-
 export const getAllTailors = async (req, res) => {
   try {
     const db = mongoose.connection.db;
@@ -38,7 +20,6 @@ export const getAllTailors = async (req, res) => {
 
     const sanitizedTailors = tailors.map((tailor) => ({
       ...tailor,
-      logoUrl: validateLogoUrl(tailor.logoUrl),
     }));
 
     res.json(sanitizedTailors);
@@ -87,7 +68,6 @@ export const getTailorById = async (req, res) => {
 
     const sanitizedTailor = {
       ...tailor,
-      logoUrl: validateLogoUrl(tailor.logoUrl),
     };
 
     res.json(sanitizedTailor);
@@ -103,10 +83,6 @@ export const updateTailorById = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = { ...req.body };
-
-    if ("logoUrl" in updateData) {
-      updateData.logoUrl = validateLogoUrl(updateData.logoUrl);
-    }
 
     const db = mongoose.connection.db;
 
@@ -124,8 +100,6 @@ export const updateTailorById = async (req, res) => {
     const updatedTailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
     });
-
-    updatedTailor.logoUrl = validateLogoUrl(updatedTailor.logoUrl);
 
     res.json(updatedTailor);
   } catch (error) {
