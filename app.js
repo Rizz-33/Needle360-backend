@@ -9,7 +9,14 @@ import tailorRoutes from "./routes/tailor.route.js";
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+    methods: ["GET", "POST", "PUT", "OPTIONS", "DELETE"],
+    allowedHeaders: ["content-type", "Authorization"],
+    credentials: true,
+  })
+);
 
 app.use(express.json()); // Body parser
 app.use(cookieParser()); // Cookie parser
