@@ -12,71 +12,85 @@ import {
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 export const signup = async (req, res) => {
-  const {
-    email,
-    password,
-    name,
-    role,
-    contactNumber,
-    address,
-    shopName,
-    shopAddress,
-    shopRegistrationNumber,
-    logoUrl,
-    bankAccountNumber,
-    bankName,
-  } = req.body;
-
-  // Check for missing fields
-  if (!email || !password || !name || !role) {
-    return res.status(400).send({ message: "Missing required fields." });
-  }
-
-  // Validate role-specific fields
-  const validateFields = (role) => {
-    const missingFields = [];
-
-    // First check if role is valid
-    if (![ROLES.TAILOR_SHOP_OWNER, ROLES.USER, ROLES.ADMIN].includes(role)) {
-      return ["Invalid role"];
-    }
-
-    switch (role) {
-      case ROLES.TAILOR_SHOP_OWNER:
-        [
-          "contactNumber",
-          "shopName",
-          "shopAddress",
-          "shopRegistrationNumber",
-          "bankAccountNumber",
-          "bankName",
-          "logoUrl",
-        ].forEach((field) => {
-          if (!req.body[field]) missingFields.push(field);
-        });
-        break;
-      case ROLES.USER:
-        ["contactNumber", "address", "bankAccountNumber", "bankName"].forEach(
-          (field) => {
-            if (!req.body[field]) missingFields.push(field);
-          }
-        );
-        break;
-      case ROLES.ADMIN:
-        break;
-    }
-    return missingFields;
-  };
-
-  const missingFields = validateFields(role);
-  if (missingFields.length > 0) {
-    return res.status(400).send({
-      message: `Missing required fields: ${missingFields.join(", ")}`,
-    });
-  }
-
-  console.log("All fields are present.");
   try {
+    const {
+      email,
+      password,
+      name,
+      role,
+      contactNumber,
+      address,
+      shopName,
+      shopAddress,
+      shopRegistrationNumber,
+      logoUrl,
+      bankAccountNumber,
+      bankName,
+    } = req.body;
+
+    // Check for missing fields
+    if (!email || !password || !name || !role) {
+      return res.status(400).send({ message: "Missing required fields." });
+    }
+
+    // Validate role-specific fields
+    const validateFields = (role) => {
+      const missingFields = [];
+
+      // First check if role is valid
+      if (![ROLES.TAILOR_SHOP_OWNER, ROLES.USER, ROLES.ADMIN].includes(role)) {
+        return ["Invalid role"];
+      }
+
+      switch (role) {
+        case ROLES.TAILOR_SHOP_OWNER:
+          [
+            "contactNumber",
+            "shopName",
+            "shopAddress",
+            "shopRegistrationNumber",
+            "bankAccountNumber",
+            "bankName",
+            "logoUrl",
+          ].forEach((field) => {
+            if (!req.body[field]) missingFields.push(field);
+          });
+          break;
+        case ROLES.USER:
+          ["contactNumber", "address", "bankAccountNumber", "bankName"].forEach(
+            (field) => {
+              if (!req.body[field]) missingFields.push(field);
+            }
+          );
+          break;
+        case ROLES.ADMIN:
+          break;
+      }
+      return missingFields;
+    };
+
+    const missingFields = validateFields(role);
+    if (missingFields.length > 0) {
+      return res.status(400).send({
+        message: `Missing required fields: ${missingFields.join(", ")}`,
+      });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).send({ message: "Invalid email format." });
+    }
+
+    // Password validation - should have minimum requirements
+    if (password.length < 8) {
+      return res
+        .status(400)
+        .send({ message: "Password must be at least 8 characters long." });
+    }
+
+    console.log("All fields are present and validated.");
+
     const db = mongoose.connection.db;
 
     // Check if the user already exists
@@ -93,7 +107,7 @@ export const signup = async (req, res) => {
     const verificationTokenExpires = Date.now() + 3600000; // 1 hour
 
     // Determine isApproved based on role
-    const isApproved = role === ROLES.USER ? true : false; // Set isApproved here
+    const isApproved = role === ROLES.USER ? true : false;
 
     // Prepare the user object based on role
     const user = {
@@ -104,6 +118,7 @@ export const signup = async (req, res) => {
       isApproved,
       verificationToken,
       verificationTokenExpires,
+      createdAt: new Date(),
       ...(role === ROLES.TAILOR_SHOP_OWNER && {
         contactNumber,
         shopName,
@@ -121,13 +136,25 @@ export const signup = async (req, res) => {
       }),
     };
 
-    // Insert the user into the collection
+    // Try to insert the user into the collection
     const result = await db.collection("users").insertOne(user);
+    if (!result.acknowledged || !result.insertedId) {
+      throw new Error("Failed to insert user into database");
+    }
 
-    // Generate token and set cookie
-    generateTokenAndSetCookie(res, user._id);
+    // Try to send verification email
+    try {
+      await sendVerificationEmail(email, verificationToken);
+    } catch (emailError) {
+      // If email sending fails, delete the user and abort signup
+      await db.collection("users").deleteOne({ _id: result.insertedId });
+      throw new Error(
+        `Failed to send verification email: ${emailError.message}`
+      );
+    }
 
-    await sendVerificationEmail(user.email, verificationToken);
+    // Generate token and set cookie only if everything succeeded
+    generateTokenAndSetCookie(res, result.insertedId);
 
     res.status(201).send({
       message: "User created successfully!",
@@ -138,6 +165,7 @@ export const signup = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Signup error:", error);
     res
       .status(500)
       .send({ message: "Error during signup", error: error.message });
