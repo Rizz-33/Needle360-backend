@@ -109,3 +109,21 @@ export const updateTailorById = async (req, res) => {
       .json({ message: "Error updating tailor profile", error: error.message });
   }
 };
+
+export const getUnapprovedTailors = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const tailors = await db
+      .collection("users")
+      .find({
+        role: ROLES.TAILOR_SHOP_OWNER,
+        isApproved: false,
+      })
+      .toArray();
+
+    res.status(200).json(tailors);
+  } catch (error) {
+    console.error("Error fetching unapproved tailors:", error);
+    res.status(500).json({ message: "Error fetching unapproved tailors" });
+  }
+};
