@@ -11,6 +11,34 @@ import {
 } from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
+// Function to generate a unique registration number
+const generateRegistrationNumber = async (db, role) => {
+  // Set prefix based on role
+  let prefix = "A"; // Default for admin
+  if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
+  else if (role === ROLES.USER) prefix = "C"; // Customer
+
+  // Find the highest existing registration number with this prefix
+  const highestRegUser = await db
+    .collection("users")
+    .find({ registrationNumber: new RegExp(`^${prefix}`) })
+    .sort({ registrationNumber: -1 })
+    .limit(1)
+    .toArray();
+
+  let nextNumber = 10000; // Start with 10000 (will become 5-digit number)
+
+  if (highestRegUser.length > 0) {
+    // Extract the numeric part of the last registration number
+    const lastRegNumber = highestRegUser[0].registrationNumber;
+    const lastSequence = parseInt(lastRegNumber.substring(1)); // Skip the prefix
+    nextNumber = lastSequence + 1;
+  }
+
+  // Format: T#####, C#####, or A#####
+  return `${prefix}${nextNumber}`;
+};
+
 export const signup = async (req, res) => {
   try {
     const {
@@ -22,7 +50,6 @@ export const signup = async (req, res) => {
       address,
       shopName,
       shopAddress,
-      shopRegistrationNumber,
       logoUrl,
       bankAccountNumber,
       bankName,
@@ -48,10 +75,9 @@ export const signup = async (req, res) => {
             "contactNumber",
             "shopName",
             "shopAddress",
-            "shopRegistrationNumber",
+            "logoUrl",
             "bankAccountNumber",
             "bankName",
-            "logoUrl",
           ].forEach((field) => {
             if (!req.body[field]) missingFields.push(field);
           });
@@ -99,6 +125,9 @@ export const signup = async (req, res) => {
       return res.status(400).send({ message: "User already exists." });
     }
 
+    // Generate a unique registration number
+    const registrationNumber = await generateRegistrationNumber(db, role);
+
     // Hash password and prepare user data
     const hashedPassword = await bcryptjs.hash(password, 12);
     const verificationToken = Math.floor(
@@ -116,6 +145,7 @@ export const signup = async (req, res) => {
       name,
       role,
       isApproved,
+      registrationNumber,
       verificationToken,
       verificationTokenExpires,
       createdAt: new Date(),
@@ -123,7 +153,7 @@ export const signup = async (req, res) => {
         contactNumber,
         shopName,
         shopAddress,
-        shopRegistrationNumber,
+        shopRegistrationNumber: registrationNumber,
         logoUrl,
         bankAccountNumber,
         bankName,
@@ -250,6 +280,7 @@ export const login = async (req, res) => {
         shopName: user.shopName,
         shopAddress: user.shopAddress,
         shopRegistrationNumber: user.shopRegistrationNumber,
+        registrationNumber: user.registrationNumber,
       },
     });
   } catch (error) {
