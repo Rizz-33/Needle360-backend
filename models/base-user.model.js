@@ -21,6 +21,10 @@ const baseUserSchema = new mongoose.Schema(
       required: true,
       enum: [ROLES.ADMIN, ROLES.TAILOR_SHOP_OWNER, ROLES.USER],
     },
+    registrationNumber: {
+      type: String,
+      required: true,
+    },
     lastLogin: {
       type: Date,
       default: Date.now,
