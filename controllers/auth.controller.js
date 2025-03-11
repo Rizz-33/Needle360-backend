@@ -11,10 +11,9 @@ import {
 } from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
-// Function to generate a unique registration number
+// Function to generate a unique registration number based on user role
 const generateRegistrationNumber = async (db, role) => {
-  // Set prefix based on role
-  let prefix = "A"; // Default for admin
+  let prefix = "A"; // Default prefix for admin
   if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
   else if (role === ROLES.USER) prefix = "C"; // Customer
 
@@ -29,13 +28,11 @@ const generateRegistrationNumber = async (db, role) => {
   let nextNumber = 10000; // Start with 10000 (will become 5-digit number)
 
   if (highestRegUser.length > 0) {
-    // Extract the numeric part of the last registration number
     const lastRegNumber = highestRegUser[0].registrationNumber;
     const lastSequence = parseInt(lastRegNumber.substring(1)); // Skip the prefix
     nextNumber = lastSequence + 1;
   }
 
-  // Format: T#####, C#####, or A#####
   return `${prefix}${nextNumber}`;
 };
 
@@ -55,7 +52,7 @@ export const signup = async (req, res) => {
       bankName,
     } = req.body;
 
-    // Check for missing fields
+    // Check for missing required fields
     if (!email || !password || !name || !role) {
       return res.status(400).send({ message: "Missing required fields." });
     }
@@ -64,7 +61,7 @@ export const signup = async (req, res) => {
     const validateFields = (role) => {
       const missingFields = [];
 
-      // First check if role is valid
+      // Check if role is valid
       if (![ROLES.TAILOR_SHOP_OWNER, ROLES.USER, ROLES.ADMIN].includes(role)) {
         return ["Invalid role"];
       }
@@ -108,7 +105,7 @@ export const signup = async (req, res) => {
       return res.status(400).send({ message: "Invalid email format." });
     }
 
-    // Password validation - should have minimum requirements
+    // Password validation
     if (password.length < 8) {
       return res
         .status(400)
@@ -166,24 +163,29 @@ export const signup = async (req, res) => {
       }),
     };
 
-    // Try to insert the user into the collection
+    // Insert the user into the collection
     const result = await db.collection("users").insertOne(user);
     if (!result.acknowledged || !result.insertedId) {
       throw new Error("Failed to insert user into database");
     }
 
-    // Try to send verification email
+    // Send verification email
     try {
       await sendVerificationEmail(email, verificationToken);
     } catch (emailError) {
-      // If email sending fails, delete the user and abort signup
-      await db.collection("users").deleteOne({ _id: result.insertedId });
-      throw new Error(
-        `Failed to send verification email: ${emailError.message}`
-      );
+      if (emailError.message.includes("has reached its limit")) {
+        console.warn(
+          "Email limit reached, continuing with signup without email verification"
+        );
+      } else {
+        await db.collection("users").deleteOne({ _id: result.insertedId });
+        throw new Error(
+          `Failed to send verification email: ${emailError.message}`
+        );
+      }
     }
 
-    // Generate token and set cookie only if everything succeeded
+    // Generate token and set cookie
     generateTokenAndSetCookie(res, result.insertedId);
 
     res.status(201).send({
@@ -303,11 +305,10 @@ export const logout = async (req, res) => {
 };
 
 export const forgotPassword = async (req, res) => {
-  // Access the email properly
   const email = req.body.email.email;
   const db = mongoose.connection.db;
 
-  console.log("Received email:", email); // Log the incoming email
+  console.log("Received email:", email);
 
   try {
     // Case-insensitive query
@@ -316,7 +317,7 @@ export const forgotPassword = async (req, res) => {
       .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
     if (!user) {
-      console.log("User not found with email:", email); // Log if no user is found
+      console.log("User not found with email:", email);
       return res.status(400).json({ message: "User not found." });
     }
 
