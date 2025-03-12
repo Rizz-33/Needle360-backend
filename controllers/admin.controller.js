@@ -65,3 +65,59 @@ export const approveTailorById = async (req, res) => {
     });
   }
 };
+
+export const getUnapprovedTailors = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+    const tailors = await db
+      .collection("users")
+      .find({
+        role: ROLES.TAILOR_SHOP_OWNER,
+        isApproved: false,
+      })
+      .toArray();
+
+    res.status(200).json(tailors);
+  } catch (error) {
+    console.error("Error fetching unapproved tailors:", error);
+    res.status(500).json({ message: "Error fetching unapproved tailors" });
+  }
+};
+
+export const getUnapprovedTailorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID format" });
+    }
+
+    const db = mongoose.connection.db;
+
+    const tailor = await db.collection("users").findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      role: ROLES.TAILOR_SHOP_OWNER,
+      isApproved: false,
+    });
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Unapproved tailor not found" });
+    }
+
+    // Remove sensitive data
+    const {
+      password,
+      resetPasswordToken,
+      resetPasswordExpires,
+      ...tailorDetails
+    } = tailor;
+
+    res.status(200).json(tailorDetails);
+  } catch (error) {
+    console.error("Error fetching unapproved tailor:", error);
+    res.status(500).json({
+      message: "Error fetching unapproved tailor",
+      error: error.message,
+    });
+  }
+};
