@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { connectToMongoDB } from "./db_connection.js";
+import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import itemRoutes from "./routes/item.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
@@ -30,6 +31,7 @@ connectToMongoDB()
     app.use("/api/auth", authRoutes);
     app.use("/api/tailor", tailorRoutes);
     app.use("/api/items", itemRoutes);
+    app.use("/api/admin", adminRoutes);
 
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
