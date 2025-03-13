@@ -9,7 +9,7 @@ import { verifyToken } from "../middleware/verifyToken.js";
 
 const router = express.Router();
 
-router.patch("/tailors/:id/approve", verifyToken, isAdmin, approveTailorById);
+router.post("/tailors/:id/approve", verifyToken, isAdmin, approveTailorById);
 router.get("/unapproved-tailors", getUnapprovedTailors);
 router.get("/unapproved-tailors/:id", getUnapprovedTailorById);
 
