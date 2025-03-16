@@ -10,6 +10,7 @@ import tailorRoutes from "./routes/tailor.route.js";
 const app = express();
 const port = process.env.PORT || 4000;
 
+// CORS configuration
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
@@ -19,6 +20,7 @@ app.use(
   })
 );
 
+// Preflight request handling
 app.options("*", (req, res) => {
   res.header(
     "Access-Control-Allow-Methods",
@@ -28,20 +30,24 @@ app.options("*", (req, res) => {
   res.status(200).send();
 });
 
-app.use(express.json()); // Body parser
+// Increase JSON payload size limit to 10MB
+app.use(express.json({ limit: "16mb" })); // Body parser with increased limit
 app.use(cookieParser()); // Cookie parser
 
+// Connect to MongoDB and start the server
 connectToMongoDB()
   .then((db) => {
     app.get("/", (req, res) => {
       res.send("Server is up and running");
     });
 
+    // Routes
     app.use("/api/auth", authRoutes);
     app.use("/api/tailor", tailorRoutes);
     app.use("/api/items", itemRoutes);
     app.use("/api/admin", adminRoutes);
 
+    // Start the server
     app.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });
