@@ -205,31 +205,69 @@ export const signup = async (req, res) => {
 };
 
 export const verifyEmail = async (req, res) => {
-  const { code } = req.body;
-
   try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res
+        .status(400)
+        .send({ message: "Verification code is required." });
+    }
+
+    console.log("Attempting to verify with code:", code);
+
     const db = mongoose.connection.db;
+
+    // Log the user we're trying to find for debugging
+    const userCount = await db.collection("users").countDocuments({
+      verificationToken: code.toString(),
+    });
+
+    console.log(`Found ${userCount} users with this verification token`);
+
+    // Check if token is expired
+    const expiredCount = await db.collection("users").countDocuments({
+      verificationToken: code.toString(),
+      verificationTokenExpires: { $lte: Date.now() },
+    });
+
+    if (expiredCount > 0) {
+      console.log("Found user but token has expired");
+    }
+
+    // Find the user with the verification token
     const user = await db.collection("users").findOne({
-      verificationToken: code,
+      verificationToken: code.toString(),
       verificationTokenExpires: { $gt: Date.now() },
     });
 
     if (!user) {
+      console.log("No valid user found with the provided code");
       return res
         .status(400)
         .send({ message: "Invalid or expired verification code." });
     }
 
-    // Update user details
-    user.isVerified = true;
-    user.verificationToken = undefined;
-    user.verificationTokenExpires = undefined;
+    console.log("Found valid user to verify:", user.email);
 
-    // Save changes
-    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
+    // Update user details
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: { isVerified: true },
+        $unset: { verificationToken: "", verificationTokenExpires: "" },
+      }
+    );
+
+    console.log("User successfully verified");
 
     // Send welcome email
-    await sendWelcomeEmail(user.email, user.name);
+    try {
+      await sendWelcomeEmail(user.email, user.name);
+      console.log("Welcome email sent successfully");
+    } catch (emailError) {
+      console.warn("Failed to send welcome email:", emailError.message);
+    }
 
     res.status(200).json({
       message: "Email verified successfully!",
@@ -239,8 +277,8 @@ export const verifyEmail = async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("Email verification error:", error);
     res.status(500).send({ message: "Internal server error." });
-    console.error(error);
   }
 };
 
