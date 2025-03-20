@@ -425,15 +425,25 @@ export const checkAuth = async (req, res) => {
       .collection("users")
       .findOne(
         { _id: new mongoose.Types.ObjectId(req.userId) },
-        { projection: { password: 0 } }
+        { projection: { email: 1, role: 1, isVerified: 1, isApproved: 1 } }
       );
 
     if (!user) {
       return res.status(401).send({ message: "User not found." });
     }
 
+    // Generate a new token (if needed) or use the existing one
+    const token = generateTokenAndSetCookie(res, user._id);
+
+    // Return only the required fields
     res.status(200).json({
-      user,
+      user: {
+        _id: user._id,
+        email: user.email,
+        role: user.role,
+        isVerified: user.isVerified,
+        isApproved: user.isApproved,
+      },
     });
   } catch (error) {
     console.log("Error checking authentication:", error.message);
