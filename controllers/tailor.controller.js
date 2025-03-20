@@ -20,6 +20,7 @@ export const getAllTailors = async (req, res) => {
 
     const sanitizedTailors = tailors.map((tailor) => ({
       ...tailor,
+      _id: tailor._id.toString(), // Convert ObjectId to string
     }));
 
     res.json(sanitizedTailors);
@@ -34,43 +35,31 @@ export const getAllTailors = async (req, res) => {
 export const getTailorById = async (req, res) => {
   try {
     const { id } = req.params;
-    const db = mongoose.connection.db;
 
-    const tailor = await db.collection("users").findOne(
-      { _id: new mongoose.Types.ObjectId(id), role: ROLES.TAILOR_SHOP_OWNER },
-      {
-        projection: {
-          _id: 1,
-          email: 1,
-          name: 1,
-          shopName: 1,
-          contactNumber: 1,
-          logoUrl: 1,
-          shopAddress: 1,
-          shopRegistrationNumber: 1,
-          bankAccountNumber: 1,
-          bankName: 1,
-          privileges: 1,
-          bio: 1,
-          offers: 1,
-          designs: 1,
-          availability: 1,
-          services: 1,
-          reviews: 1,
-          ratings: 1,
-        },
-      }
-    );
+    // Check if id is undefined or null
+    if (!id || id === "undefined") {
+      return res.status(400).json({ message: "Missing tailor ID" });
+    }
+
+    // Validate the ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID format" });
+    }
+
+    const db = mongoose.connection.db;
+    const tailor = await db.collection("users").findOne({
+      _id: new mongoose.Types.ObjectId(id),
+      role: ROLES.TAILOR_SHOP_OWNER,
+    });
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    const sanitizedTailor = {
+    res.json({
       ...tailor,
-    };
-
-    res.json(sanitizedTailor);
+      _id: tailor._id.toString(), // Convert ObjectId to string
+    });
   } catch (error) {
     console.error("Error fetching tailor:", error);
     res
@@ -82,6 +71,12 @@ export const getTailorById = async (req, res) => {
 export const updateTailorById = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Validate ID
+    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
+
     const updateData = { ...req.body };
 
     const db = mongoose.connection.db;
@@ -101,7 +96,11 @@ export const updateTailorById = async (req, res) => {
       _id: new mongoose.Types.ObjectId(id),
     });
 
-    res.json(updatedTailor);
+    // Convert ObjectId to string for response
+    res.json({
+      ...updatedTailor,
+      _id: updatedTailor._id.toString(),
+    });
   } catch (error) {
     console.error("Error updating tailor profile:", error);
     res
