@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 dotenv.config();
 
 const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
-
 const connectionString = `mongodb+srv://risiniamarathunga:${password}@devcluster.4xxln.mongodb.net/database?retryWrites=true&w=majority&appName=DevCluster`;
 
 mongoose.connection.on("connected", () => {
@@ -18,8 +17,6 @@ mongoose.connection.on("error", (err) => {
 export async function connectToMongoDB() {
   try {
     await mongoose.connect(connectionString, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
       serverSelectionTimeoutMS: 30000,
       socketTimeoutMS: 45000,
     });
