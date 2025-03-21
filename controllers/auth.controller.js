@@ -117,10 +117,9 @@ export const signup = async (req, res) => {
     const db = mongoose.connection.db;
 
     // Check if the user already exists
-    const existingUser = await db.collection("users").findOne({ email });
-    if (existingUser) {
-      return res.status(400).send({ message: "User already exists." });
-    }
+    const existingUser = await db
+      .collection("users")
+      .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
     // Generate a unique registration number
     const registrationNumber = await generateRegistrationNumber(db, role);
@@ -476,5 +475,57 @@ export const checkIsApproved = async (req, res) => {
   } catch (error) {
     console.error("Error fetching isApproved value:", error.message);
     res.status(500).json({ message: "Error fetching isApproved value." });
+  }
+};
+
+export const deleteAccount = async (req, res) => {
+  try {
+    const userId = req.userId; // Assuming this comes from your auth middleware
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).send({ message: "Invalid user ID." });
+    }
+
+    const db = mongoose.connection.db;
+
+    // Find the user to be deleted
+    const user = await db.collection("users").findOne({
+      _id: new mongoose.Types.ObjectId(userId),
+    });
+
+    if (!user) {
+      return res.status(404).send({ message: "User not found." });
+    }
+
+    // Optional: Perform additional checks if needed
+    // For example, you might want to require password confirmation for deletion
+    const { password } = req.body;
+    if (password) {
+      const isPasswordValid = await bcryptjs.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(400).send({ message: "Invalid password." });
+      }
+    }
+
+    // Delete the user
+    const result = await db.collection("users").deleteOne({
+      _id: new mongoose.Types.ObjectId(userId),
+    });
+
+    if (result.deletedCount === 0) {
+      return res.status(400).send({ message: "Failed to delete account." });
+    }
+
+    // Clear authentication cookie
+    res.clearCookie("token");
+
+    // Return success message
+    res.status(200).send({ message: "Account deleted successfully." });
+  } catch (error) {
+    console.error("Delete account error:", error);
+    res.status(500).send({
+      message: "Error during account deletion",
+      error: error.message,
+    });
   }
 };
