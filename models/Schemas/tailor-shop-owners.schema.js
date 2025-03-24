@@ -53,9 +53,10 @@ const tailorShopOwnerSchema = new mongoose.Schema(
     designs: {
       type: [
         {
-          title: String,
-          description: String,
-          image: String,
+          itemName: { type: String, required: true },
+          description: { type: String },
+          price: { type: Number, required: true },
+          imageURLs: [{ type: String }],
         },
       ],
       default: [],
@@ -82,9 +83,10 @@ const tailorShopOwnerSchema = new mongoose.Schema(
     services: {
       type: [
         {
-          title: String,
-          description: String,
-          price: String,
+          itemName: { type: String, required: true },
+          description: { type: String },
+          price: { type: Number, required: true },
+          imageURLs: [{ type: String }],
         },
       ],
       default: [],
