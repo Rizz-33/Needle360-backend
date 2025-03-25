@@ -86,8 +86,7 @@ export const getTailorById = async (req, res) => {
   }
 };
 
-// New endpoint to fetch only designs for a specific tailor
-export const getTailorDesigns = async (req, res) => {
+export const getTailorBio = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -98,26 +97,164 @@ export const getTailorDesigns = async (req, res) => {
 
     const db = mongoose.connection.db;
 
-    // Only fetch the designs field
+    // Fetch only the bio field
     const tailor = await db.collection("users").findOne(
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
       },
-      { projection: { designs: 1 } }
+      { projection: { bio: 1 } }
     );
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Return just the designs array or an empty array if no designs
-    res.json(tailor.designs || []);
+    // Return the bio or an empty string if no bio exists
+    res.json(tailor.bio || "");
   } catch (error) {
-    console.error("Error fetching tailor designs:", error);
+    console.error("Error fetching tailor bio:", error);
     res
       .status(500)
-      .json({ message: "Error fetching tailor designs", error: error.message });
+      .json({ message: "Error fetching tailor bio", error: error.message });
+  }
+};
+
+export const getTailorOffers = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID
+    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
+
+    const db = mongoose.connection.db;
+
+    // Fetch only the offers field
+    const tailor = await db.collection("users").findOne(
+      {
+        _id: new mongoose.Types.ObjectId(id),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { projection: { offers: 1 } }
+    );
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    // Return the offers array or an empty array if no offers exist
+    res.json(tailor.offers || []);
+  } catch (error) {
+    console.error("Error fetching tailor offers:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching tailor offers", error: error.message });
+  }
+};
+
+export const getTailorAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID
+    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
+
+    const db = mongoose.connection.db;
+
+    // Fetch only the availability field
+    const tailor = await db.collection("users").findOne(
+      {
+        _id: new mongoose.Types.ObjectId(id),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { projection: { availability: 1 } }
+    );
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    // Return the availability object or an empty object if no availability exists
+    res.json(tailor.availability || {});
+  } catch (error) {
+    console.error("Error fetching tailor availability:", error);
+    res.status(500).json({
+      message: "Error fetching tailor availability",
+      error: error.message,
+    });
+  }
+};
+
+export const getTailorServices = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID
+    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
+
+    const db = mongoose.connection.db;
+
+    // Fetch only the services field
+    const tailor = await db.collection("users").findOne(
+      {
+        _id: new mongoose.Types.ObjectId(id),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { projection: { services: 1 } }
+    );
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    // Return the services array or an empty array if no services exist
+    res.json(tailor.services || []);
+  } catch (error) {
+    console.error("Error fetching tailor services:", error);
+    res.status(500).json({
+      message: "Error fetching tailor services",
+      error: error.message,
+    });
+  }
+};
+
+export const getTailorReviews = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate ID
+    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
+
+    const db = mongoose.connection.db;
+
+    // Fetch only the reviews field
+    const tailor = await db.collection("users").findOne(
+      {
+        _id: new mongoose.Types.ObjectId(id),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { projection: { reviews: 1 } }
+    );
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    // Return the reviews array or an empty array if no reviews exist
+    res.json(tailor.reviews || []);
+  } catch (error) {
+    console.error("Error fetching tailor reviews:", error);
+    res
+      .status(500)
+      .json({ message: "Error fetching tailor reviews", error: error.message });
   }
 };
 
