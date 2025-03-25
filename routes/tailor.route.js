@@ -1,8 +1,12 @@
 import express from "express";
 import {
   getAllTailors,
+  getTailorAvailability,
+  getTailorBio,
   getTailorById,
-  getTailorDesigns,
+  getTailorOffers,
+  getTailorReviews,
+  getTailorServices,
   updateTailorById,
 } from "../controllers/tailor.controller.js";
 
@@ -10,7 +14,11 @@ const router = express.Router();
 
 router.get("/tailors", getAllTailors);
 router.get("/tailors/:id", getTailorById);
-router.get("/tailors/:id/designs", getTailorDesigns);
+router.get("/tailors/:id/bio", getTailorBio);
+router.get("/tailors/:id/offers", getTailorOffers);
+router.get("/tailors/:id/availability", getTailorAvailability);
+router.get("/tailors/:id/services", getTailorServices);
+router.get("/tailors/:id/reviews", getTailorReviews);
 router.put("/tailors/:id", updateTailorById);
 
 export default router;
