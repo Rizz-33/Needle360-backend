@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { v4 as uuidv4 } from "uuid"; // Import uuid for generating unique IDs
+import { v4 as uuidv4 } from "uuid";
 import ROLES from "../constants.js";
 
 // Utility function to validate ObjectId
@@ -19,9 +19,7 @@ const validateDesignData = (design) => {
     };
   }
 
-  // Check for required fields based on the structure
   if (design.itemName) {
-    // Structure 1: itemName, price, description, imageURLs
     if (typeof design.itemName !== "string") {
       return {
         isValid: false,
@@ -35,7 +33,6 @@ const validateDesignData = (design) => {
       };
     }
   } else if (design.title) {
-    // Structure 2: title, description, image
     if (typeof design.title !== "string") {
       return {
         isValid: false,
@@ -123,9 +120,8 @@ export const createTailorDesign = async (req, res) => {
       return res.status(400).json({ message: designValidation.message });
     }
 
-    // Generate a unique ID for the design
     const designId = uuidv4();
-    const newDesign = { ...design, id: designId }; // Add the unique ID to the design
+    const newDesign = { ...design, id: designId };
 
     const db = mongoose.connection.db;
     const tailor = await db
@@ -140,9 +136,7 @@ export const createTailorDesign = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res
-      .status(201)
-      .json({ message: "Design added successfully", design: newDesign });
+    res.status(201).json({ design: newDesign });
   } catch (error) {
     console.error("Error creating tailor design:", error);
     res.status(500).json({
@@ -172,9 +166,9 @@ export const updateTailorDesign = async (req, res) => {
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
-        "designs.id": designId, // Use the unique ID to find the design
+        "designs.id": designId,
       },
-      { $set: { "designs.$": { ...design, id: designId } } }, // Preserve the unique ID
+      { $set: { "designs.$": { ...design, id: designId } } },
       { returnDocument: "after" }
     );
 
@@ -182,7 +176,7 @@ export const updateTailorDesign = async (req, res) => {
       return res.status(404).json({ message: "Tailor or design not found" });
     }
 
-    res.json({ message: "Design updated successfully", design });
+    res.json({ design: { ...design, id: designId } });
   } catch (error) {
     console.error("Error updating tailor design:", error);
     res.status(500).json({
@@ -206,7 +200,7 @@ export const deleteTailorDesign = async (req, res) => {
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
-        "designs.id": designId, // Use the unique ID to find the design
+        "designs.id": designId,
       },
       { $pull: { designs: { id: designId } } },
       { returnDocument: "after" }
