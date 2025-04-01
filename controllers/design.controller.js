@@ -111,6 +111,7 @@ export const getTailorDesignsById = async (req, res) => {
     const designs = (tailor.designs || []).map((design) => ({
       ...design,
       tailorId: id, // Add the tailorId to each design
+      imageUrl: design.imageUrl || design.imageURLs?.[0] || null,
     }));
 
     res.json(designs);
