@@ -55,15 +55,26 @@ const validateDesignData = (design) => {
   return { isValid: true };
 };
 
+// Fetch all designs from all tailors
 export const getAllTailorDesigns = async (req, res) => {
   try {
     const db = mongoose.connection.db;
     const tailors = await db
       .collection("users")
-      .find({ role: ROLES.TAILOR_SHOP_OWNER }, { projection: { designs: 1 } })
+      .find(
+        { role: ROLES.TAILOR_SHOP_OWNER },
+        { projection: { designs: 1, _id: 1 } }
+      )
       .toArray();
 
-    const allDesigns = tailors.flatMap((tailor) => tailor.designs || []);
+    // Add tailorId to each design for frontend reference
+    const allDesigns = tailors.flatMap((tailor) =>
+      (tailor.designs || []).map((design) => ({
+        ...design,
+        tailorId: tailor._id.toString(), // Convert ObjectId to string for frontend
+      }))
+    );
+
     res.json(allDesigns);
   } catch (error) {
     console.error("Error fetching all tailor designs:", error);
@@ -74,6 +85,7 @@ export const getAllTailorDesigns = async (req, res) => {
   }
 };
 
+// Fetch all designs for a specific tailor by their ID
 export const getTailorDesignsById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -95,7 +107,13 @@ export const getTailorDesignsById = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.json(tailor.designs || []);
+    // Add tailorId to each design for frontend reference
+    const designs = (tailor.designs || []).map((design) => ({
+      ...design,
+      tailorId: id, // Add the tailorId to each design
+    }));
+
+    res.json(designs);
   } catch (error) {
     console.error("Error fetching tailor designs:", error);
     res.status(500).json({
@@ -105,6 +123,7 @@ export const getTailorDesignsById = async (req, res) => {
   }
 };
 
+// Create a new design for a specific tailor
 export const createTailorDesign = async (req, res) => {
   try {
     const { id } = req.params;
@@ -121,7 +140,22 @@ export const createTailorDesign = async (req, res) => {
     }
 
     const designId = uuidv4();
-    const newDesign = { ...design, id: designId };
+    const newDesign = {
+      _id: designId,
+      ...design,
+      tailorId: id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      imageUrl: design.imageURLs?.[0] || null, // Map imageURLs to imageUrl
+    };
+
+    // Remove any id field if it exists to avoid duplication
+    delete newDesign.id;
+
+    // Handle image URLs consistency
+    if (newDesign.imageURLs) {
+      delete newDesign.imageURLs;
+    }
 
     const db = mongoose.connection.db;
     const tailor = await db
@@ -146,6 +180,7 @@ export const createTailorDesign = async (req, res) => {
   }
 };
 
+// Update an existing design for a specific tailor
 export const updateTailorDesign = async (req, res) => {
   try {
     const { id, designId } = req.params;
@@ -161,22 +196,56 @@ export const updateTailorDesign = async (req, res) => {
       return res.status(400).json({ message: designValidation.message });
     }
 
+    const updateData = {
+      ...design,
+      updatedAt: new Date(),
+    };
+
+    // Handle image URL update
+    if (design.imageURLs) {
+      updateData.imageUrl = design.imageURLs[0] || null;
+      delete updateData.imageURLs;
+    }
+
+    // Remove any id field if it exists to avoid duplication
+    delete updateData.id;
+
     const db = mongoose.connection.db;
-    const tailor = await db.collection("users").findOneAndUpdate(
+    const result = await db.collection("users").findOneAndUpdate(
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
-        "designs.id": designId,
+        "designs._id": designId,
       },
-      { $set: { "designs.$": { ...design, id: designId } } },
+      {
+        $set: {
+          "designs.$": {
+            ...updateData,
+            _id: designId, // Keep the original _id
+            tailorId: id, // Keep the original tailorId
+          },
+        },
+      },
       { returnDocument: "after" }
     );
+
+    // In newer versions of MongoDB, the result structure has changed
+    const tailor = result.value || result;
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor or design not found" });
     }
 
-    res.json({ design: { ...design, id: designId } });
+    // Find the updated design in the response
+    const updatedDesign = tailor.designs.find(
+      (d) => d._id.toString() === designId
+    );
+
+    if (!updatedDesign) {
+      return res.status(404).json({ message: "Design not found after update" });
+    }
+
+    res.json({ design: updatedDesign });
   } catch (error) {
     console.error("Error updating tailor design:", error);
     res.status(500).json({
@@ -186,6 +255,7 @@ export const updateTailorDesign = async (req, res) => {
   }
 };
 
+// Delete a specific design for a tailor
 export const deleteTailorDesign = async (req, res) => {
   try {
     const { id, designId } = req.params;
@@ -200,9 +270,9 @@ export const deleteTailorDesign = async (req, res) => {
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
-        "designs.id": designId,
+        "designs._id": designId, // Changed from "designs.id" to "designs._id"
       },
-      { $pull: { designs: { id: designId } } },
+      { $pull: { designs: { _id: designId } } }, // Changed from id to _id
       { returnDocument: "after" }
     );
 
