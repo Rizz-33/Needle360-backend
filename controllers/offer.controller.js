@@ -33,6 +33,30 @@ const validateOfferData = (offer) => {
     };
   }
 
+  if (
+    offer.percentage &&
+    (isNaN(offer.percentage) || offer.percentage < 0 || offer.percentage > 100)
+  ) {
+    return {
+      isValid: false,
+      message: "Percentage must be a number between 0 and 100.",
+    };
+  }
+
+  if (offer.startDate && isNaN(new Date(offer.startDate).getTime())) {
+    return {
+      isValid: false,
+      message: "Invalid start date format.",
+    };
+  }
+
+  if (offer.endDate && isNaN(new Date(offer.endDate).getTime())) {
+    return {
+      isValid: false,
+      message: "Invalid end date format.",
+    };
+  }
+
   return { isValid: true };
 };
 
@@ -133,6 +157,10 @@ export const createTailorOffer = async (req, res) => {
     // Remove any id field if it exists to avoid duplication
     delete newOffer.id;
 
+    // Convert dates to Date objects if they exist
+    if (newOffer.startDate) newOffer.startDate = new Date(newOffer.startDate);
+    if (newOffer.endDate) newOffer.endDate = new Date(newOffer.endDate);
+
     const db = mongoose.connection.db;
     const tailor = await db
       .collection("users")
@@ -179,6 +207,11 @@ export const updateTailorOffer = async (req, res) => {
 
     // Remove any id field if it exists to avoid duplication
     delete updateData.id;
+
+    // Convert dates to Date objects if they exist
+    if (updateData.startDate)
+      updateData.startDate = new Date(updateData.startDate);
+    if (updateData.endDate) updateData.endDate = new Date(updateData.endDate);
 
     const db = mongoose.connection.db;
     const result = await db.collection("users").findOneAndUpdate(
