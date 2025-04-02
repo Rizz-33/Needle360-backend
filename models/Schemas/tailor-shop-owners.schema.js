@@ -45,6 +45,9 @@ const tailorShopOwnerSchema = new mongoose.Schema(
         {
           title: String,
           description: String,
+          percentage: Number,
+          startDate: Date,
+          endDate: Date,
           image: String,
         },
       ],
