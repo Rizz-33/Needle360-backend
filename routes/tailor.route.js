@@ -2,9 +2,7 @@ import express from "express";
 import {
   getAllTailors,
   getTailorAvailability,
-  getTailorBio,
   getTailorById,
-  getTailorOffers,
   getTailorReviews,
   getTailorServices,
   updateTailorById,
@@ -14,8 +12,6 @@ const router = express.Router();
 
 router.get("/tailors", getAllTailors);
 router.get("/tailors/:id", getTailorById);
-router.get("/tailors/:id/bio", getTailorBio);
-router.get("/tailors/:id/offers", getTailorOffers);
 router.get("/tailors/:id/availability", getTailorAvailability);
 router.get("/tailors/:id/services", getTailorServices);
 router.get("/tailors/:id/reviews", getTailorReviews);
