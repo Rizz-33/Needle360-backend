@@ -4,6 +4,7 @@ import express from "express";
 import { connectToMongoDB } from "./db_connection.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
+import availabilityRoutes from "./routes/availability.route.js";
 import designRoutes from "./routes/design.route.js";
 import offerRoutes from "./routes/offer.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
@@ -50,6 +51,7 @@ connectToMongoDB()
     app.use("/api/user-interactions", userInteractionsRoutes);
     app.use("/api/design", designRoutes);
     app.use("/api/offer", offerRoutes);
+    app.use("/api/availability", availabilityRoutes);
 
     // Start the server
     app.listen(port, () => {

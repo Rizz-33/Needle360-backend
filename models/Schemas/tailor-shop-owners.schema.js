@@ -67,8 +67,23 @@ const tailorShopOwnerSchema = new mongoose.Schema(
     availability: {
       type: [
         {
-          day: String,
-          hours: String,
+          status: String,
+          from: { type: Date, required: true },
+          to: { type: Date, required: true },
+          day: {
+            type: String,
+            enum: [
+              "Monday",
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday",
+              "Sunday",
+            ],
+            required: true,
+          },
+          isOpen: { type: Boolean, default: true },
         },
       ],
       default: [],
