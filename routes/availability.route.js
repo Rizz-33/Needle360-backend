@@ -1,22 +1,19 @@
 import express from "express";
 import {
-  createTailorAvailability,
-  deleteTailorAvailability,
+  createBulkAvailability,
+  deleteBulkAvailability,
   getTailorAvailability,
-  updateTailorAvailability,
+  updateBulkAvailability,
 } from "../controllers/availability.controller.js";
 
 const router = express.Router();
 
 router.get("/:id", getTailorAvailability);
-router.post("/:id", createTailorAvailability);
-router.put(
-  "/tailors/:id/availability/:availabilityId",
-  updateTailorAvailability
-);
+router.post("/:id", createBulkAvailability);
+router.put("/tailors/:id/availability/:availabilityId", updateBulkAvailability);
 router.delete(
   "/tailors/:id/availability/:availabilityId",
-  deleteTailorAvailability
+  deleteBulkAvailability
 );
 
 export default router;
