@@ -8,8 +8,8 @@ import {
 
 const router = express.Router();
 
-router.get("/tailors/:id", getTailorAvailability);
-router.post("/tailors/:id", createTailorAvailability);
+router.get("/:id", getTailorAvailability);
+router.post("/:id", createTailorAvailability);
 router.put(
   "/tailors/:id/availability/:availabilityId",
   updateTailorAvailability
