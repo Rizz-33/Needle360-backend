@@ -50,16 +50,6 @@ const validateAvailabilityData = (availability) => {
     };
   }
 
-  try {
-    new Date(availability.from);
-    new Date(availability.to);
-  } catch (error) {
-    return {
-      isValid: false,
-      message: "Invalid date format for 'from' or 'to'.",
-    };
-  }
-
   if (typeof availability.isOpen !== "boolean") {
     return {
       isValid: false,
@@ -81,15 +71,13 @@ export const getTailorAvailability = async (req, res) => {
     }
 
     const db = mongoose.connection.db;
-    const tailor = await db
-      .collection("users")
-      .findOne(
-        {
-          _id: new mongoose.Types.ObjectId(id.toString()),
-          role: ROLES.TAILOR_SHOP_OWNER,
-        },
-        { projection: { availability: 1 } }
-      );
+    const tailor = await db.collection("users").findOne(
+      {
+        _id: new mongoose.Types.ObjectId(id.toString()),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { projection: { availability: 1 } }
+    );
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor not found" });
@@ -105,43 +93,160 @@ export const getTailorAvailability = async (req, res) => {
   }
 };
 
-// Create a new availability slot for a specific tailor
-export const createTailorAvailability = async (req, res) => {
+// Create multiple availability slots for a tailor
+export const createBulkAvailability = async (req, res) => {
   try {
     const { id } = req.params;
-    const { availability } = req.body;
+    const { slots } = req.body;
 
     const idValidation = validateObjectId(id);
     if (!idValidation.isValid) {
       return res.status(400).json({ message: idValidation.message });
     }
 
-    const availabilityValidation = validateAvailabilityData(availability);
-    if (!availabilityValidation.isValid) {
-      return res.status(400).json({ message: availabilityValidation.message });
+    if (!Array.isArray(slots) || slots.length === 0) {
+      return res.status(400).json({ message: "Slots array is required" });
     }
 
-    // Generate a unique ID for the availability slot
-    const availabilityId = uuidv4();
-    const newAvailability = {
-      _id: availabilityId,
-      ...availability,
-      status: availability.status || "available",
+    // Validate each slot
+    for (const slot of slots) {
+      const validation = validateAvailabilityData(slot);
+      if (!validation.isValid) {
+        return res.status(400).json({ message: validation.message });
+      }
+    }
+
+    // Generate new slots with unique IDs
+    const newSlots = slots.map((slot) => ({
+      _id: uuidv4(),
+      day: slot.day,
+      from: new Date(`1970-01-01T${slot.from}:00`),
+      to: new Date(`1970-01-01T${slot.to}:00`),
+      isOpen: slot.isOpen,
+      status: slot.status || "available",
       createdAt: new Date(),
       updatedAt: new Date(),
-    };
+    }));
 
     const db = mongoose.connection.db;
-    const result = await db
-      .collection("users")
-      .findOneAndUpdate(
-        {
-          _id: new mongoose.Types.ObjectId(id.toString()),
-          role: ROLES.TAILOR_SHOP_OWNER,
+    const result = await db.collection("users").findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(id.toString()),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { $push: { availability: { $each: newSlots } } },
+      { returnDocument: "after" }
+    );
+
+    const tailor = result.value || result;
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    res.status(201).json({ slots: newSlots });
+  } catch (error) {
+    console.error("Error creating bulk availability:", error);
+    res.status(500).json({
+      message: "Error creating bulk availability",
+      error: error.message,
+    });
+  }
+};
+
+// Update multiple availability slots
+export const updateBulkAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { updates } = req.body;
+
+    const idValidation = validateObjectId(id);
+    if (!idValidation.isValid) {
+      return res.status(400).json({ message: idValidation.message });
+    }
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ message: "Updates array is required" });
+    }
+
+    const db = mongoose.connection.db;
+    const tailor = await db.collection("users").findOne({
+      _id: new mongoose.Types.ObjectId(id.toString()),
+      role: ROLES.TAILOR_SHOP_OWNER,
+    });
+
+    if (!tailor) {
+      return res.status(404).json({ message: "Tailor not found" });
+    }
+
+    // Prepare bulk write operations
+    const bulkOps = updates.map((update) => {
+      const { slotId, ...updateData } = update;
+      return {
+        updateOne: {
+          filter: {
+            _id: new mongoose.Types.ObjectId(id.toString()),
+            "availability._id": slotId,
+          },
+          update: {
+            $set: {
+              "availability.$": {
+                ...updateData,
+                _id: slotId,
+                from: new Date(`1970-01-01T${updateData.from}:00`),
+                to: new Date(`1970-01-01T${updateData.to}:00`),
+                updatedAt: new Date(),
+              },
+            },
+          },
         },
-        { $push: { availability: newAvailability } },
-        { returnDocument: "after" }
-      );
+      };
+    });
+
+    await db.collection("users").bulkWrite(bulkOps);
+
+    // Fetch updated availability
+    const updatedTailor = await db.collection("users").findOne({
+      _id: new mongoose.Types.ObjectId(id.toString()),
+      role: ROLES.TAILOR_SHOP_OWNER,
+    });
+
+    res.json({
+      slots: updatedTailor?.availability || [],
+    });
+  } catch (error) {
+    console.error("Error updating bulk availability:", error);
+    res.status(500).json({
+      message: "Error updating bulk availability",
+      error: error.message,
+    });
+  }
+};
+
+// Delete multiple availability slots
+export const deleteBulkAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { slotIds } = req.body;
+
+    const idValidation = validateObjectId(id);
+    if (!idValidation.isValid) {
+      return res.status(400).json({ message: idValidation.message });
+    }
+
+    if (!Array.isArray(slotIds) || slotIds.length === 0) {
+      return res.status(400).json({ message: "Slot IDs array is required" });
+    }
+
+    const db = mongoose.connection.db;
+    const result = await db.collection("users").findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(id.toString()),
+        role: ROLES.TAILOR_SHOP_OWNER,
+      },
+      { $pull: { availability: { _id: { $in: slotIds } } } },
+      { returnDocument: "after" }
+    );
 
     // In newer versions of MongoDB, the result structure has changed
     const tailor = result.value || result;
@@ -150,120 +255,14 @@ export const createTailorAvailability = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.status(201).json({ availability: newAvailability });
-  } catch (error) {
-    console.error("Error creating tailor availability:", error);
-    res.status(500).json({
-      message: "Error creating tailor availability",
-      error: error.message,
+    res.json({
+      message: "Slots deleted successfully",
+      slots: tailor.availability,
     });
-  }
-};
-
-// Update an existing availability slot for a specific tailor
-export const updateTailorAvailability = async (req, res) => {
-  try {
-    const { id, availabilityId } = req.params;
-    const { availability } = req.body;
-
-    const idValidation = validateObjectId(id);
-    if (!idValidation.isValid) {
-      return res.status(400).json({ message: idValidation.message });
-    }
-
-    const availabilityValidation = validateAvailabilityData(availability);
-    if (!availabilityValidation.isValid) {
-      return res.status(400).json({ message: availabilityValidation.message });
-    }
-
-    const updateData = {
-      ...availability,
-      updatedAt: new Date(),
-    };
-
-    const db = mongoose.connection.db;
-    const result = await db.collection("users").findOneAndUpdate(
-      {
-        _id: new mongoose.Types.ObjectId(id.toString()),
-        role: ROLES.TAILOR_SHOP_OWNER,
-        "availability._id": availabilityId,
-      },
-      {
-        $set: {
-          "availability.$": {
-            ...updateData,
-            _id: availabilityId, // Keep the original _id
-          },
-        },
-      },
-      { returnDocument: "after" }
-    );
-
-    // In newer versions of MongoDB, the result structure has changed
-    const tailor = result.value || result;
-
-    if (!tailor) {
-      return res
-        .status(404)
-        .json({ message: "Tailor or availability slot not found" });
-    }
-
-    // Find the updated availability in the response
-    const updatedAvailability = tailor.availability
-      ? tailor.availability.find((a) => a._id === availabilityId)
-      : null;
-
-    if (!updatedAvailability) {
-      return res
-        .status(404)
-        .json({ message: "Availability slot not found after update" });
-    }
-
-    res.json({ availability: updatedAvailability });
   } catch (error) {
-    console.error("Error updating tailor availability:", error);
+    console.error("Error deleting bulk availability:", error);
     res.status(500).json({
-      message: "Error updating tailor availability",
-      error: error.message,
-    });
-  }
-};
-
-// Delete a specific availability slot for a tailor
-export const deleteTailorAvailability = async (req, res) => {
-  try {
-    const { id, availabilityId } = req.params;
-
-    const idValidation = validateObjectId(id);
-    if (!idValidation.isValid) {
-      return res.status(400).json({ message: idValidation.message });
-    }
-
-    const db = mongoose.connection.db;
-    const result = await db.collection("users").findOneAndUpdate(
-      {
-        _id: new mongoose.Types.ObjectId(id.toString()),
-        role: ROLES.TAILOR_SHOP_OWNER,
-        "availability._id": availabilityId,
-      },
-      { $pull: { availability: { _id: availabilityId } } },
-      { returnDocument: "after" }
-    );
-
-    // In newer versions of MongoDB, the result structure has changed
-    const tailor = result.value || result;
-
-    if (!tailor) {
-      return res
-        .status(404)
-        .json({ message: "Tailor or availability slot not found" });
-    }
-
-    res.json({ message: "Availability slot deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting tailor availability:", error);
-    res.status(500).json({
-      message: "Error deleting tailor availability",
+      message: "Error deleting bulk availability",
       error: error.message,
     });
   }
