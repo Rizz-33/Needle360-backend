@@ -67,9 +67,10 @@ const tailorShopOwnerSchema = new mongoose.Schema(
     availability: {
       type: [
         {
-          status: String,
-          from: { type: Date, required: true },
-          to: { type: Date, required: true },
+          _id: {
+            type: String,
+            default: () => new mongoose.Types.ObjectId().toString(),
+          },
           day: {
             type: String,
             enum: [
@@ -83,7 +84,31 @@ const tailorShopOwnerSchema = new mongoose.Schema(
             ],
             required: true,
           },
-          isOpen: { type: Boolean, default: true },
+          from: {
+            type: Date,
+            required: true,
+          },
+          to: {
+            type: Date,
+            required: true,
+          },
+          isOpen: {
+            type: Boolean,
+            default: true,
+          },
+          status: {
+            type: String,
+            enum: ["available", "busy", "break"],
+            default: "available",
+          },
+          createdAt: {
+            type: Date,
+            default: Date.now,
+          },
+          updatedAt: {
+            type: Date,
+            default: Date.now,
+          },
         },
       ],
       default: [],
