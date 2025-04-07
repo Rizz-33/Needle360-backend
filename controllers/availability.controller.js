@@ -10,6 +10,16 @@ const validateObjectId = (id) => {
   return { isValid: true };
 };
 
+// Utility function to validate time format (HH:MM)
+const isValidTimeFormat = (time) => {
+  return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time);
+};
+
+// Utility function to get current UTC date
+const getCurrentUTCDate = () => {
+  return new Date();
+};
+
 // Utility function to validate availability data
 const validateAvailabilityData = (availability) => {
   if (!availability || typeof availability !== "object") {
@@ -50,6 +60,16 @@ const validateAvailabilityData = (availability) => {
     };
   }
 
+  if (
+    !isValidTimeFormat(availability.from) ||
+    !isValidTimeFormat(availability.to)
+  ) {
+    return {
+      isValid: false,
+      message: "Time must be in HH:MM format (24-hour clock).",
+    };
+  }
+
   if (typeof availability.isOpen !== "boolean") {
     return {
       isValid: false,
@@ -83,7 +103,16 @@ export const getTailorAvailability = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.json(tailor.availability || []);
+    // Format the time - don't attempt to use toTimeString since the values are already strings
+    const formattedAvailability =
+      tailor.availability?.map((slot) => ({
+        ...slot,
+        // Keep the time values as they are since they're already in HH:MM format
+        from: slot.from,
+        to: slot.to,
+      })) || [];
+
+    res.json(formattedAvailability);
   } catch (error) {
     console.error("Error fetching tailor availability:", error);
     res.status(500).json({
@@ -98,6 +127,7 @@ export const createBulkAvailability = async (req, res) => {
   try {
     const { id } = req.params;
     const { slots } = req.body;
+    const currentUTCDate = getCurrentUTCDate();
 
     const idValidation = validateObjectId(id);
     if (!idValidation.isValid) {
@@ -116,16 +146,16 @@ export const createBulkAvailability = async (req, res) => {
       }
     }
 
-    // Generate new slots with unique IDs
+    // Generate new slots with proper time handling and UTC date
     const newSlots = slots.map((slot) => ({
       _id: uuidv4(),
       day: slot.day,
-      from: new Date(`1970-01-01T${slot.from}:00`),
-      to: new Date(`1970-01-01T${slot.to}:00`),
+      from: slot.from,
+      to: slot.to,
       isOpen: slot.isOpen,
       status: slot.status || "available",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: currentUTCDate,
+      updatedAt: currentUTCDate,
     }));
 
     const db = mongoose.connection.db;
@@ -160,59 +190,68 @@ export const updateBulkAvailability = async (req, res) => {
     const { id } = req.params;
     const { updates } = req.body;
 
-    const idValidation = validateObjectId(id);
-    if (!idValidation.isValid) {
-      return res.status(400).json({ message: idValidation.message });
+    const validation = validateObjectId(id);
+    if (!validation.isValid) {
+      return res.status(400).json({ message: validation.message });
     }
 
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ message: "Updates array is required" });
     }
 
-    const db = mongoose.connection.db;
-    const tailor = await db.collection("users").findOne({
-      _id: new mongoose.Types.ObjectId(id.toString()),
-      role: ROLES.TAILOR_SHOP_OWNER,
-    });
-
-    if (!tailor) {
-      return res.status(404).json({ message: "Tailor not found" });
+    // Validate each update
+    for (const update of updates) {
+      const validation = validateAvailabilityData(update);
+      if (!validation.isValid) {
+        return res.status(400).json({ message: validation.message });
+      }
+      if (!update.id) {
+        return res
+          .status(400)
+          .json({ message: "Slot ID is required for updates" });
+      }
     }
 
-    // Prepare bulk write operations
-    const bulkOps = updates.map((update) => {
-      const { slotId, ...updateData } = update;
-      return {
-        updateOne: {
-          filter: {
-            _id: new mongoose.Types.ObjectId(id.toString()),
-            "availability._id": slotId,
-          },
-          update: {
-            $set: {
-              "availability.$": {
-                ...updateData,
-                _id: slotId,
-                from: new Date(`1970-01-01T${updateData.from}:00`),
-                to: new Date(`1970-01-01T${updateData.to}:00`),
-                updatedAt: new Date(),
-              },
-            },
+    const db = mongoose.connection.db;
+    const bulkOps = updates.map((update) => ({
+      updateOne: {
+        filter: {
+          _id: new mongoose.Types.ObjectId(id),
+          "availability._id": update.id,
+        },
+        update: {
+          $set: {
+            "availability.$.day": update.day,
+            "availability.$.from": update.from,
+            "availability.$.to": update.to,
+            "availability.$.isOpen": update.isOpen,
+            "availability.$.status": update.status || "available",
+            "availability.$.updatedAt": new Date(),
           },
         },
-      };
-    });
+      },
+    }));
 
-    await db.collection("users").bulkWrite(bulkOps);
+    console.log("Executing bulk operations:", bulkOps);
+    const result = await db.collection("users").bulkWrite(bulkOps);
+    console.log("Bulk write result:", result);
 
-    // Fetch updated availability
-    const updatedTailor = await db.collection("users").findOne({
-      _id: new mongoose.Types.ObjectId(id.toString()),
-      role: ROLES.TAILOR_SHOP_OWNER,
-    });
+    // Verify the update by fetching the updated document
+    const updatedTailor = await db
+      .collection("users")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(id) },
+        { projection: { availability: 1 } }
+      );
+
+    if (!updatedTailor) {
+      return res.status(404).json({ message: "Tailor not found after update" });
+    }
 
     res.json({
-      slots: updatedTailor?.availability || [],
+      success: true,
+      modifiedCount: result.modifiedCount,
+      slots: updatedTailor.availability,
     });
   } catch (error) {
     console.error("Error updating bulk availability:", error);
