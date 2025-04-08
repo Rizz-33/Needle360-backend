@@ -164,20 +164,37 @@ export const updateTailorServices = async (req, res) => {
 };
 
 /**
- * Delete all services for a tailor
+ * Delete services from a tailor's services list
  */
 export const deleteTailorServices = async (req, res) => {
   try {
     const { id } = req.params;
+    const { services } = req.body;
 
     // Validate ID
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
     }
 
+    // Validate service data
+    if (!services || !Array.isArray(services) || services.length === 0) {
+      return res.status(400).json({
+        message: "Invalid services data. Services must be a non-empty array.",
+      });
+    }
+
+    // Validate each service
+    for (const service of services) {
+      if (typeof service !== "string" || service.trim() === "") {
+        return res
+          .status(400)
+          .json({ message: "Each service must be a non-empty string." });
+      }
+    }
+
     const db = mongoose.connection.db;
 
-    // Check if tailor exists first
+    // Check if tailor exists
     const tailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
       role: ROLES.TAILOR_SHOP_OWNER,
@@ -187,16 +204,23 @@ export const deleteTailorServices = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Set services to an empty array
+    // Remove the services
     await db
       .collection("users")
       .updateOne(
         { _id: new mongoose.Types.ObjectId(id) },
-        { $set: { services: [] } }
+        { $pull: { services: { $in: services } } }
       );
 
-    // Return empty services array
-    res.json({ services: [] });
+    // Get updated services list
+    const updatedTailor = await db
+      .collection("users")
+      .findOne(
+        { _id: new mongoose.Types.ObjectId(id) },
+        { projection: { services: 1 } }
+      );
+
+    res.json({ services: updatedTailor.services });
   } catch (error) {
     console.error("Error deleting tailor services:", error);
     res.status(500).json({
