@@ -124,14 +124,7 @@ const tailorShopOwnerSchema = new mongoose.Schema(
       default: {},
     },
     services: {
-      type: [
-        {
-          itemName: { type: String, required: true },
-          description: { type: String },
-          price: { type: Number, required: true },
-          imageURLs: [{ type: String }],
-        },
-      ],
+      type: [String],
       default: [],
     },
     reviews: {
