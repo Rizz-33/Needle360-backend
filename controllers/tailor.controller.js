@@ -88,41 +88,6 @@ export const getTailorById = async (req, res) => {
   }
 };
 
-export const getTailorAvailability = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Validate ID
-    if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: "Invalid tailor ID" });
-    }
-
-    const db = mongoose.connection.db;
-
-    // Fetch only the availability field
-    const tailor = await db.collection("users").findOne(
-      {
-        _id: new mongoose.Types.ObjectId(id),
-        role: ROLES.TAILOR_SHOP_OWNER,
-      },
-      { projection: { availability: 1 } }
-    );
-
-    if (!tailor) {
-      return res.status(404).json({ message: "Tailor not found" });
-    }
-
-    // Return the availability object or an empty object if no availability exists
-    res.json(tailor.availability || {});
-  } catch (error) {
-    console.error("Error fetching tailor availability:", error);
-    res.status(500).json({
-      message: "Error fetching tailor availability",
-      error: error.message,
-    });
-  }
-};
-
 export const getTailorReviews = async (req, res) => {
   try {
     const { id } = req.params;
