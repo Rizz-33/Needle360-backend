@@ -10,6 +10,7 @@ import offerRoutes from "./routes/offer.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
+import userRoutes from "./routes/user.route.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -54,6 +55,7 @@ connectToMongoDB()
     app.use("/api/offer", offerRoutes);
     app.use("/api/availability", availabilityRoutes);
     app.use("/api/services", serviceRoutes);
+    app.use("/api/user", userRoutes);
 
     // Start the server
     app.listen(port, () => {
