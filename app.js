@@ -5,12 +5,12 @@ import { connectToMongoDB } from "./db_connection.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
+import customerRoutes from "./routes/customer.route.js";
 import designRoutes from "./routes/design.route.js";
 import offerRoutes from "./routes/offer.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
-import userRoutes from "./routes/user.route.js";
 
 const app = express();
 const port = process.env.PORT || 4000;
@@ -55,7 +55,7 @@ connectToMongoDB()
     app.use("/api/offer", offerRoutes);
     app.use("/api/availability", availabilityRoutes);
     app.use("/api/services", serviceRoutes);
-    app.use("/api/user", userRoutes);
+    app.use("/api/customer", customerRoutes);
 
     // Start the server
     app.listen(port, () => {
