@@ -20,6 +20,28 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    designs: {
+      type: [
+        {
+          itemName: { type: String, required: true },
+          description: { type: String },
+          price: { type: Number, required: true },
+          imageURLs: [{ type: String }],
+        },
+      ],
+      default: [],
+    },
+    reviews: {
+      type: [
+        {
+          clientId: mongoose.Schema.Types.ObjectId,
+          rating: Number,
+          comment: String,
+          date: Date,
+        },
+      ],
+      default: [],
+    },
     bankAccountNumber: {
       type: String,
       required: true,
