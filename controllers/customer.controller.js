@@ -16,6 +16,7 @@ export const getAllCustomers = async (req, res) => {
         followers: 1,
         following: 1,
         profilePic: 1,
+        bio: 1,
       })
       .toArray();
 
@@ -62,6 +63,7 @@ export const getCustomerById = async (req, res) => {
       createdAt: 1,
       lastLogin: 1,
       profilePic: 1,
+      bio: 1,
     };
 
     const customer = await db.collection("users").findOne(
