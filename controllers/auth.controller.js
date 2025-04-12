@@ -303,11 +303,12 @@ export const login = async (req, res) => {
       return res.status(400).send({ message: "Invalid email or password." });
     }
 
-    // Generate token and set cookie
-    generateTokenAndSetCookie(res, user._id);
+    // Generate token, set cookie, and get the token value
+    const token = generateTokenAndSetCookie(res, user._id);
 
     res.status(200).send({
       message: "Successfully logged in!",
+      token, // Include the token in the response
       user: {
         email: user.email,
         name: user.name,
