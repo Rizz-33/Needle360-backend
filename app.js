@@ -1,18 +1,24 @@
+// server.js
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import http from "http";
 import { connectToMongoDB } from "./db_connection.js";
+import initializeSocketServer from "./middleware/socket.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
+import conversationRoutes from "./routes/conversation.route.js";
 import customerRoutes from "./routes/customer.route.js";
 import designRoutes from "./routes/design.route.js";
+import messageRoutes from "./routes/message.route.js";
 import offerRoutes from "./routes/offer.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
 
 const app = express();
+const server = http.createServer(app);
 const port = process.env.PORT || 4000;
 
 // CORS configuration
@@ -57,8 +63,15 @@ connectToMongoDB()
     app.use("/api/services", serviceRoutes);
     app.use("/api/customer", customerRoutes);
 
-    // Start the server
-    app.listen(port, () => {
+    // Chat routes
+    app.use("/api/conversations", conversationRoutes);
+    app.use("/api/messages", messageRoutes);
+
+    // Initialize Socket.io
+    const io = initializeSocketServer(server);
+
+    // Start the HTTP server
+    server.listen(port, () => {
       console.log(`Server is running on port ${port}`);
     });
   })
