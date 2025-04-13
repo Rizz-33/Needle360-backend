@@ -32,6 +32,10 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    clientId: {
+      type: String,
+      required: false,
+    },
   },
   {
     timestamps: true,

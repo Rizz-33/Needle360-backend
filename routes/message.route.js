@@ -3,6 +3,7 @@ import express from "express";
 import {
   deleteMessage,
   getConversationMessages,
+  markMessagesAsRead,
   sendMessage,
 } from "../controllers/message.controller.js";
 import { verifyToken } from "../middleware/verifyToken.js"; // Adjust the import path to your actual verify token middleware
@@ -15,6 +16,7 @@ router.use(verifyToken);
 // Routes
 router.post("/send", sendMessage);
 router.get("/conversation/:conversationId", getConversationMessages);
+router.post("/conversation/:conversationId/read", markMessagesAsRead);
 router.delete("/:messageId", deleteMessage);
 
 export default router;
