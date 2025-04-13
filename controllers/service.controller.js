@@ -2,6 +2,59 @@ import mongoose from "mongoose";
 import ROLES from "../constants.js";
 
 /**
+ * Get all services from all tailors
+ */
+export const getAllServices = async (req, res) => {
+  try {
+    const db = mongoose.connection.db;
+
+    // Find all users with tailor role that have services
+    const tailors = await db
+      .collection("users")
+      .find(
+        {
+          role: ROLES.TAILOR_SHOP_OWNER,
+          services: { $exists: true, $ne: [] },
+        },
+        { projection: { services: 1, businessName: 1 } }
+      )
+      .toArray();
+
+    if (!tailors || tailors.length === 0) {
+      return res.json({ services: [] });
+    }
+
+    // Aggregate all unique services
+    const allServices = new Set();
+
+    tailors.forEach((tailor) => {
+      if (tailor.services && Array.isArray(tailor.services)) {
+        tailor.services.forEach((service) => allServices.add(service));
+      }
+    });
+
+    // Convert to array and return
+    const uniqueServices = Array.from(allServices);
+
+    res.json({
+      services: uniqueServices,
+      count: uniqueServices.length,
+      tailors: tailors.map((tailor) => ({
+        id: tailor._id,
+        businessName: tailor.businessName || "Unknown",
+        servicesCount: tailor.services ? tailor.services.length : 0,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching all services:", error);
+    res.status(500).json({
+      message: "Error fetching all services",
+      error: error.message,
+    });
+  }
+};
+
+/**
  * Get all services for a specific tailor
  */
 export const getTailorServices = async (req, res) => {
