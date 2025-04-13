@@ -114,15 +114,40 @@ export const getConversationMessages = async (req, res) => {
       .limit(limitNum)
       .populate("sender", "firstName lastName profilePicture role");
 
-    // Mark messages as read
-    await Message.updateMany(
+    // Mark messages as read, but don't wait for the operation to complete
+    // before sending response
+    Message.updateMany(
       {
         conversation: conversationId,
         sender: { $ne: userId },
         readBy: { $ne: userId },
       },
       { $addToSet: { readBy: userId } }
-    );
+    )
+      .then((updateResult) => {
+        if (updateResult.modifiedCount > 0) {
+          // Find the messages that were just marked as read
+          Message.find({
+            conversation: conversationId,
+            sender: { $ne: userId },
+            readBy: userId,
+            _id: { $in: messages.map((msg) => msg._id) },
+          }).then((updatedMessages) => {
+            // Emit read receipt event
+            const io = req.app.get("io");
+            if (io) {
+              io.to(conversationId).emit("messagesRead", {
+                conversationId,
+                readBy: userId,
+                messageIds: updatedMessages.map((msg) => msg._id),
+              });
+            }
+          });
+        }
+      })
+      .catch((err) => {
+        console.error("Error updating message read status:", err);
+      });
 
     res.status(200).json({
       messages,
@@ -138,7 +163,6 @@ export const getConversationMessages = async (req, res) => {
   }
 };
 
-// In message.controller.js, add this function
 export const markMessagesAsRead = async (req, res) => {
   try {
     const { conversationId } = req.params;
@@ -155,9 +179,11 @@ export const markMessagesAsRead = async (req, res) => {
       readBy: { $ne: userId },
     });
 
+    let updatedCount = 0;
+
     if (unreadMessages.length > 0) {
       // Add current user to readBy array
-      await Message.updateMany(
+      const updateResult = await Message.updateMany(
         {
           conversation: conversationId,
           sender: { $ne: userId },
@@ -165,6 +191,8 @@ export const markMessagesAsRead = async (req, res) => {
         },
         { $addToSet: { readBy: userId } }
       );
+
+      updatedCount = updateResult.modifiedCount;
 
       // Emit read receipt event to all clients in this conversation
       const io = req.app.get("io");
@@ -177,7 +205,11 @@ export const markMessagesAsRead = async (req, res) => {
       }
     }
 
-    res.status(200).json({ success: true, count: unreadMessages.length });
+    res.status(200).json({
+      success: true,
+      count: updatedCount,
+      messageIds: unreadMessages.map((msg) => msg._id),
+    });
   } catch (error) {
     console.error("Error in markMessagesAsRead:", error);
     res.status(500).json({ message: "Server error", error: error.message });
