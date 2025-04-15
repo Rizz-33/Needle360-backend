@@ -60,6 +60,7 @@ export const getTailorById = async (req, res) => {
       shopAddress: 1,
       bio: 1,
       services: 1,
+      role: 1,
       // Only include designs if not excluded
       ...(excludeDesigns ? {} : { designs: 1 }),
     };
