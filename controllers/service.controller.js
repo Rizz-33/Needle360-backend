@@ -16,7 +16,17 @@ export const getAllServices = async (req, res) => {
           role: ROLES.TAILOR_SHOP_OWNER,
           services: { $exists: true, $ne: [] },
         },
-        { projection: { services: 1, businessName: 1 } }
+        {
+          projection: {
+            _id: 1,
+            shopName: 1,
+            services: 1,
+            email: 1,
+            contactNumber: 1,
+            shopAddress: 1,
+            logoUrl: 1,
+          },
+        }
       )
       .toArray();
 
@@ -24,9 +34,14 @@ export const getAllServices = async (req, res) => {
       services: PREDEFINED_SERVICES,
       count: PREDEFINED_SERVICES.length,
       tailors: tailors.map((tailor) => ({
-        id: tailor._id,
-        // shopName: tailor.shopName || tailor.name || "Unknown",
+        _id: tailor._id.toString(), // Use _id consistently
+        shopName: tailor.shopName || "Unknown",
+        services: tailor.services || [],
         servicesCount: tailor.services ? tailor.services.length : 0,
+        email: tailor.email,
+        contactNumber: tailor.contactNumber,
+        shopAddress: tailor.shopAddress,
+        logoUrl: tailor.logoUrl,
       })),
     });
   } catch (error) {
@@ -45,32 +60,109 @@ export const getTailorServices = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate ID
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
     }
 
     const db = mongoose.connection.db;
 
-    // Fetch only the services field
     const tailor = await db.collection("users").findOne(
       {
         _id: new mongoose.Types.ObjectId(id),
         role: ROLES.TAILOR_SHOP_OWNER,
       },
-      { projection: { services: 1 } }
+      {
+        projection: {
+          services: 1,
+          shopName: 1,
+          email: 1,
+          contactNumber: 1,
+          shopAddress: 1,
+          logoUrl: 1,
+        },
+      }
     );
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Return the services array in the requested format
-    res.json({ services: tailor.services || [] });
+    res.json({
+      _id: tailor._id.toString(),
+      shopName: tailor.shopName || "Unknown",
+      services: tailor.services || [],
+      email: tailor.email,
+      contactNumber: tailor.contactNumber,
+      shopAddress: tailor.shopAddress,
+      logoUrl: tailor.logoUrl,
+    });
   } catch (error) {
     console.error("Error fetching tailor services:", error);
     res.status(500).json({
       message: "Error fetching tailor services",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get tailors offering a specific service
+ */
+export const getTailorsByService = async (req, res) => {
+  try {
+    const { serviceName } = req.params;
+
+    if (
+      !serviceName ||
+      !PREDEFINED_SERVICES.includes(decodeURIComponent(serviceName))
+    ) {
+      return res.status(400).json({
+        message: `Invalid service name. Must be one of: ${PREDEFINED_SERVICES.join(
+          ", "
+        )}`,
+      });
+    }
+
+    const db = mongoose.connection.db;
+
+    const tailors = await db
+      .collection("users")
+      .find(
+        {
+          role: ROLES.TAILOR_SHOP_OWNER,
+          services: decodeURIComponent(serviceName),
+        },
+        {
+          projection: {
+            _id: 1,
+            shopName: 1,
+            services: 1,
+            email: 1,
+            contactNumber: 1,
+            shopAddress: 1,
+            logoUrl: 1,
+          },
+        }
+      )
+      .toArray();
+
+    res.json({
+      service: decodeURIComponent(serviceName),
+      tailors: tailors.map((tailor) => ({
+        _id: tailor._id.toString(),
+        shopName: tailor.shopName || "Unknown",
+        services: tailor.services || [],
+        email: tailor.email,
+        contactNumber: tailor.contactNumber,
+        shopAddress: tailor.shopAddress,
+        logoUrl: tailor.logoUrl,
+      })),
+      count: tailors.length,
+    });
+  } catch (error) {
+    console.error("Error fetching tailors by service:", error);
+    res.status(500).json({
+      message: "Error fetching tailors by service",
       error: error.message,
     });
   }
@@ -84,19 +176,16 @@ export const addTailorServices = async (req, res) => {
     const { id } = req.params;
     const { services } = req.body;
 
-    // Validate ID
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
     }
 
-    // Validate service data
     if (!services || !Array.isArray(services) || services.length === 0) {
       return res.status(400).json({
         message: "Invalid services data. Services must be a non-empty array.",
       });
     }
 
-    // Validate each service exists in predefined services
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
@@ -108,7 +197,6 @@ export const addTailorServices = async (req, res) => {
 
     const db = mongoose.connection.db;
 
-    // Check if tailor exists
     const tailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
       role: ROLES.TAILOR_SHOP_OWNER,
@@ -118,7 +206,6 @@ export const addTailorServices = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Add services to tailor's services array (only adds services that don't already exist)
     await db
       .collection("users")
       .updateOne(
@@ -126,15 +213,29 @@ export const addTailorServices = async (req, res) => {
         { $addToSet: { services: { $each: services } } }
       );
 
-    // Get updated services list
-    const updatedTailor = await db
-      .collection("users")
-      .findOne(
-        { _id: new mongoose.Types.ObjectId(id) },
-        { projection: { services: 1 } }
-      );
+    const updatedTailor = await db.collection("users").findOne(
+      { _id: new mongoose.Types.ObjectId(id) },
+      {
+        projection: {
+          services: 1,
+          shopName: 1,
+          email: 1,
+          contactNumber: 1,
+          shopAddress: 1,
+          logoUrl: 1,
+        },
+      }
+    );
 
-    res.status(201).json({ services: updatedTailor.services });
+    res.status(201).json({
+      _id: updatedTailor._id.toString(),
+      shopName: updatedTailor.shopName || "Unknown",
+      services: updatedTailor.services,
+      email: updatedTailor.email,
+      contactNumber: updatedTailor.contactNumber,
+      shopAddress: updatedTailor.shopAddress,
+      logoUrl: updatedTailor.logoUrl,
+    });
   } catch (error) {
     console.error("Error adding tailor services:", error);
     res
@@ -151,17 +252,14 @@ export const updateTailorServices = async (req, res) => {
     const { id } = req.params;
     const { services } = req.body;
 
-    // Validate ID
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
     }
 
-    // Validate services data
     if (!services || !Array.isArray(services)) {
       return res.status(400).json({ message: "Services must be an array" });
     }
 
-    // Validate each service exists in predefined services
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
@@ -173,7 +271,6 @@ export const updateTailorServices = async (req, res) => {
 
     const db = mongoose.connection.db;
 
-    // Check if tailor exists
     const tailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
       role: ROLES.TAILOR_SHOP_OWNER,
@@ -183,7 +280,6 @@ export const updateTailorServices = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Replace all services
     await db
       .collection("users")
       .updateOne(
@@ -191,7 +287,15 @@ export const updateTailorServices = async (req, res) => {
         { $set: { services: services } }
       );
 
-    res.json({ services: services });
+    res.json({
+      _id: tailor._id.toString(),
+      shopName: tailor.shopName || "Unknown",
+      services: services,
+      email: tailor.email,
+      contactNumber: tailor.contactNumber,
+      shopAddress: tailor.shopAddress,
+      logoUrl: tailor.logoUrl,
+    });
   } catch (error) {
     console.error("Error updating all tailor services:", error);
     res.status(500).json({
@@ -209,19 +313,16 @@ export const deleteTailorServices = async (req, res) => {
     const { id } = req.params;
     const { services } = req.body;
 
-    // Validate ID
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
     }
 
-    // Validate service data
     if (!services || !Array.isArray(services) || services.length === 0) {
       return res.status(400).json({
         message: "Invalid services data. Services must be a non-empty array.",
       });
     }
 
-    // Validate each service exists in predefined services
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
@@ -233,7 +334,6 @@ export const deleteTailorServices = async (req, res) => {
 
     const db = mongoose.connection.db;
 
-    // Check if tailor exists
     const tailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
       role: ROLES.TAILOR_SHOP_OWNER,
@@ -243,7 +343,6 @@ export const deleteTailorServices = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Remove the services
     await db
       .collection("users")
       .updateOne(
@@ -251,15 +350,29 @@ export const deleteTailorServices = async (req, res) => {
         { $pull: { services: { $in: services } } }
       );
 
-    // Get updated services list
-    const updatedTailor = await db
-      .collection("users")
-      .findOne(
-        { _id: new mongoose.Types.ObjectId(id) },
-        { projection: { services: 1 } }
-      );
+    const updatedTailor = await db.collection("users").findOne(
+      { _id: new mongoose.Types.ObjectId(id) },
+      {
+        projection: {
+          services: 1,
+          shopName: 1,
+          email: 1,
+          contactNumber: 1,
+          shopAddress: 1,
+          logoUrl: 1,
+        },
+      }
+    );
 
-    res.json({ services: updatedTailor.services });
+    res.json({
+      _id: updatedTailor._id.toString(),
+      shopName: updatedTailor.shopName || "Unknown",
+      services: updatedTailor.services,
+      email: updatedTailor.email,
+      contactNumber: updatedTailor.contactNumber,
+      shopAddress: updatedTailor.shopAddress,
+      logoUrl: updatedTailor.logoUrl,
+    });
   } catch (error) {
     console.error("Error deleting tailor services:", error);
     res.status(500).json({
