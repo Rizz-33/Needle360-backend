@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
-import ROLES from "../constants.js";
+import ROLES, { PREDEFINED_SERVICES } from "../constants.js";
 
 /**
- * Get all services from all tailors
+ * Get all predefined services
  */
 export const getAllServices = async (req, res) => {
   try {
@@ -20,28 +20,12 @@ export const getAllServices = async (req, res) => {
       )
       .toArray();
 
-    if (!tailors || tailors.length === 0) {
-      return res.json({ services: [] });
-    }
-
-    // Aggregate all unique services
-    const allServices = new Set();
-
-    tailors.forEach((tailor) => {
-      if (tailor.services && Array.isArray(tailor.services)) {
-        tailor.services.forEach((service) => allServices.add(service));
-      }
-    });
-
-    // Convert to array and return
-    const uniqueServices = Array.from(allServices);
-
     res.json({
-      services: uniqueServices,
-      count: uniqueServices.length,
+      services: PREDEFINED_SERVICES,
+      count: PREDEFINED_SERVICES.length,
       tailors: tailors.map((tailor) => ({
         id: tailor._id,
-        businessName: tailor.businessName || "Unknown",
+        // shopName: tailor.shopName || tailor.name || "Unknown",
         servicesCount: tailor.services ? tailor.services.length : 0,
       })),
     });
@@ -112,12 +96,13 @@ export const addTailorServices = async (req, res) => {
       });
     }
 
-    // Validate each service
+    // Validate each service exists in predefined services
     for (const service of services) {
-      if (typeof service !== "string" || service.trim() === "") {
-        return res
-          .status(400)
-          .json({ message: "Each service must be a non-empty string." });
+      if (!PREDEFINED_SERVICES.includes(service)) {
+        return res.status(400).json({
+          message: `Service "${service}" is not in the predefined services list.`,
+          predefinedServices: PREDEFINED_SERVICES,
+        });
       }
     }
 
@@ -176,12 +161,12 @@ export const updateTailorServices = async (req, res) => {
       return res.status(400).json({ message: "Services must be an array" });
     }
 
-    // Validate each service is a non-empty string
+    // Validate each service exists in predefined services
     for (const service of services) {
-      if (typeof service !== "string" || service.trim() === "") {
+      if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
-          message:
-            "Invalid service data. Each service must be a non-empty string.",
+          message: `Service "${service}" is not in the predefined services list.`,
+          predefinedServices: PREDEFINED_SERVICES,
         });
       }
     }
@@ -236,12 +221,13 @@ export const deleteTailorServices = async (req, res) => {
       });
     }
 
-    // Validate each service
+    // Validate each service exists in predefined services
     for (const service of services) {
-      if (typeof service !== "string" || service.trim() === "") {
-        return res
-          .status(400)
-          .json({ message: "Each service must be a non-empty string." });
+      if (!PREDEFINED_SERVICES.includes(service)) {
+        return res.status(400).json({
+          message: `Service "${service}" is not in the predefined services list.`,
+          predefinedServices: PREDEFINED_SERVICES,
+        });
       }
     }
 
