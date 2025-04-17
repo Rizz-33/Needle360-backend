@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { v4 as uuidv4 } from "uuid";
-import ROLES from "../constants.js";
+import ROLES, { PREDEFINED_SERVICES } from "../constants.js";
 
 // Utility function to validate ObjectId
 const validateObjectId = (id) => {
@@ -52,6 +52,21 @@ const validateDesignData = (design) => {
     };
   }
 
+  // Validate tags if provided
+  if (design.tags && Array.isArray(design.tags)) {
+    const invalidTags = design.tags.filter(
+      (tag) => !PREDEFINED_SERVICES.includes(tag)
+    );
+    if (invalidTags.length > 0) {
+      return {
+        isValid: false,
+        message: `Invalid tags: ${invalidTags.join(
+          ", "
+        )}. Tags must be from predefined services.`,
+      };
+    }
+  }
+
   return { isValid: true };
 };
 
@@ -71,7 +86,7 @@ export const getAllDesigns = async (req, res) => {
     const allDesigns = users.flatMap((user) =>
       (user.designs || []).map((design) => ({
         ...design,
-        userId: user._id.toString(), // Convert ObjectId to string for frontend
+        userId: user._id.toString(),
         userType: user.role === ROLES.TAILOR_SHOP_OWNER ? "tailor" : "customer",
       }))
     );
@@ -102,7 +117,7 @@ export const getAllTailorDesigns = async (req, res) => {
     const allDesigns = tailors.flatMap((tailor) =>
       (tailor.designs || []).map((design) => ({
         ...design,
-        tailorId: tailor._id.toString(), // Convert ObjectId to string for frontend
+        tailorId: tailor._id.toString(),
       }))
     );
 
@@ -129,7 +144,7 @@ export const getAllCustomerDesigns = async (req, res) => {
     const allDesigns = customers.flatMap((customer) =>
       (customer.designs || []).map((design) => ({
         ...design,
-        customerId: customer._id.toString(), // Convert ObjectId to string for frontend
+        customerId: customer._id.toString(),
       }))
     );
 
@@ -168,7 +183,7 @@ export const getTailorDesignsById = async (req, res) => {
     // Add tailorId to each design for frontend reference
     const designs = (tailor.designs || []).map((design) => ({
       ...design,
-      tailorId: id, // Add the tailorId to each design
+      tailorId: id,
       imageUrl: design.imageUrl || design.imageURLs?.[0] || null,
     }));
 
@@ -207,7 +222,7 @@ export const getCustomerDesignsById = async (req, res) => {
     // Add customerId to each design for frontend reference
     const designs = (customer.designs || []).map((design) => ({
       ...design,
-      customerId: id, // Add the customerId to each design
+      customerId: id,
       imageUrl: design.imageUrl || design.imageURLs?.[0] || null,
     }));
 
@@ -244,7 +259,8 @@ export const createTailorDesign = async (req, res) => {
       tailorId: id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      imageUrl: design.imageURLs?.[0] || null, // Map imageURLs to imageUrl
+      imageUrl: design.imageURLs?.[0] || null,
+      tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
     // Remove any id field if it exists to avoid duplication
@@ -301,7 +317,8 @@ export const createCustomerDesign = async (req, res) => {
       customerId: id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      imageUrl: design.imageURLs?.[0] || null, // Map imageURLs to imageUrl
+      imageUrl: design.imageURLs?.[0] || null,
+      tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
     // Remove any id field if it exists to avoid duplication
@@ -354,6 +371,7 @@ export const updateTailorDesign = async (req, res) => {
     const updateData = {
       ...design,
       updatedAt: new Date(),
+      tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
     // Handle image URL update
@@ -376,22 +394,20 @@ export const updateTailorDesign = async (req, res) => {
         $set: {
           "designs.$": {
             ...updateData,
-            _id: designId, // Keep the original _id
-            tailorId: id, // Keep the original tailorId
+            _id: designId,
+            tailorId: id,
           },
         },
       },
       { returnDocument: "after" }
     );
 
-    // In newer versions of MongoDB, the result structure has changed
     const tailor = result.value || result;
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor or design not found" });
     }
 
-    // Find the updated design in the response
     const updatedDesign = tailor.designs.find(
       (d) => d._id.toString() === designId
     );
@@ -429,6 +445,7 @@ export const updateCustomerDesign = async (req, res) => {
     const updateData = {
       ...design,
       updatedAt: new Date(),
+      tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
     // Handle image URL update
@@ -451,22 +468,20 @@ export const updateCustomerDesign = async (req, res) => {
         $set: {
           "designs.$": {
             ...updateData,
-            _id: designId, // Keep the original _id
-            customerId: id, // Keep the original customerId
+            _id: designId,
+            customerId: id,
           },
         },
       },
       { returnDocument: "after" }
     );
 
-    // In newer versions of MongoDB, the result structure has changed
     const customer = result.value || result;
 
     if (!customer) {
       return res.status(404).json({ message: "Customer or design not found" });
     }
 
-    // Find the updated design in the response
     const updatedDesign = customer.designs.find(
       (d) => d._id.toString() === designId
     );
