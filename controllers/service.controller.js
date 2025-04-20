@@ -112,10 +112,16 @@ export const getTailorsByService = async (req, res) => {
   try {
     const { serviceName } = req.params;
 
-    if (
-      !serviceName ||
-      !PREDEFINED_SERVICES.includes(decodeURIComponent(serviceName))
-    ) {
+    // Decode and normalize service name (trim and lowercase)
+    const decodedServiceName = decodeURIComponent(serviceName).trim();
+    const normalizedServiceName = decodedServiceName.toLowerCase();
+
+    // Validate service name against PREDEFINED_SERVICES (case-insensitive)
+    const matchedService = PREDEFINED_SERVICES.find(
+      (service) => service.toLowerCase() === normalizedServiceName
+    );
+
+    if (!decodedServiceName || !matchedService) {
       return res.status(400).json({
         message: `Invalid service name. Must be one of: ${PREDEFINED_SERVICES.join(
           ", "
@@ -125,12 +131,13 @@ export const getTailorsByService = async (req, res) => {
 
     const db = mongoose.connection.db;
 
+    // Find tailors with the exact service (case-insensitive match)
     const tailors = await db
       .collection("users")
       .find(
         {
           role: ROLES.TAILOR_SHOP_OWNER,
-          services: decodeURIComponent(serviceName),
+          services: matchedService, // Use the exact service name from PREDEFINED_SERVICES
         },
         {
           projection: {
@@ -146,8 +153,12 @@ export const getTailorsByService = async (req, res) => {
       )
       .toArray();
 
+    console.log(
+      `Fetched ${tailors.length} tailors for service "${matchedService}"`
+    );
+
     res.json({
-      service: decodeURIComponent(serviceName),
+      service: matchedService,
       tailors: tailors.map((tailor) => ({
         _id: tailor._id.toString(),
         shopName: tailor.shopName || "Unknown",
@@ -174,7 +185,7 @@ export const getTailorsByService = async (req, res) => {
 export const addTailorServices = async (req, res) => {
   try {
     const { id } = req.params;
-    const { services } = req.body;
+    let { services } = req.body;
 
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
@@ -186,6 +197,8 @@ export const addTailorServices = async (req, res) => {
       });
     }
 
+    // Normalize service names and validate
+    services = services.map((service) => service.trim());
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
@@ -250,7 +263,7 @@ export const addTailorServices = async (req, res) => {
 export const updateTailorServices = async (req, res) => {
   try {
     const { id } = req.params;
-    const { services } = req.body;
+    let { services } = req.body;
 
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
@@ -260,6 +273,8 @@ export const updateTailorServices = async (req, res) => {
       return res.status(400).json({ message: "Services must be an array" });
     }
 
+    // Normalize service names and validate
+    services = services.map((service) => service.trim());
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
@@ -311,7 +326,7 @@ export const updateTailorServices = async (req, res) => {
 export const deleteTailorServices = async (req, res) => {
   try {
     const { id } = req.params;
-    const { services } = req.body;
+    let { services } = req.body;
 
     if (!id || id === "undefined" || !mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid tailor ID" });
@@ -323,6 +338,8 @@ export const deleteTailorServices = async (req, res) => {
       });
     }
 
+    // Normalize service names and validate
+    services = services.map((service) => service.trim());
     for (const service of services) {
       if (!PREDEFINED_SERVICES.includes(service)) {
         return res.status(400).json({
