@@ -12,8 +12,10 @@ import availabilityRoutes from "./routes/availability.route.js";
 import conversationRoutes from "./routes/conversation.route.js";
 import customerRoutes from "./routes/customer.route.js";
 import designRoutes from "./routes/design.route.js";
+import inventoryRoutes from "./routes/inventory.route.js";
 import messageRoutes from "./routes/message.route.js";
 import offerRoutes from "./routes/offer.route.js";
+import orderRoutes from "./routes/order.route.js";
 import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
@@ -99,6 +101,8 @@ connectToMongoDB()
     app.use("/api/conversations", conversationRoutes);
     app.use("/api/messages", messageRoutes);
     app.use("/api/review", reviewRoutes);
+    app.use("/api/inventory", inventoryRoutes);
+    app.use("/api/order", orderRoutes);
 
     // Start HTTP + Socket.IO server
     httpServer.listen(port, () => {
