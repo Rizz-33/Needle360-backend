@@ -46,6 +46,37 @@ export const getAllOrders = async (req, res) => {
   }
 };
 
+// Get orders by customer ID
+export const getOrderByCustomerId = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, status } = req.query;
+    const customerId = req.user._id;
+
+    const query = { customerId };
+    if (status) query.status = status;
+
+    const orders = await Order.find(query)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(Number(limit));
+
+    const total = await Order.countDocuments(query);
+
+    // Sanitize orders for response
+    const sanitizedOrders = orders.map((order) => sanitizeOrder(order));
+
+    res.json({ orders: sanitizedOrders, total, page, limit });
+  } catch (error) {
+    console.error("Error fetching customer orders:", error);
+    res
+      .status(500)
+      .json({
+        message: "Error fetching customer orders",
+        error: error.message,
+      });
+  }
+};
+
 // Create a new order
 export const createOrder = async (req, res) => {
   try {
