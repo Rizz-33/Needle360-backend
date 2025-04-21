@@ -32,6 +32,6 @@ const ACCESSORY_TYPES = [
 
 const UNITS = ["meters", "pieces", "rolls", "grams", "units"];
 
-const ORDER_STATUSES = ["pending", "inProgress", "completed", "cancelled"];
+const ORDER_STATUSES = ["pending", "processing", "completed", "cancelled"];
 
 export { ACCESSORY_TYPES, ORDER_STATUSES, PREDEFINED_SERVICES, UNITS };
