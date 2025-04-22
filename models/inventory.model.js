@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { ACCESSORY_TYPES, UNITS } from "../constants.js";
+import { UNITS } from "../constants.js";
 
 const inventorySchema = new mongoose.Schema({
   tailorId: {
@@ -17,7 +17,7 @@ const inventorySchema = new mongoose.Schema({
   type: {
     type: String,
     required: true,
-    enum: ACCESSORY_TYPES,
+    trim: true,
   },
   quantity: {
     type: Number,
