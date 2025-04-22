@@ -9,7 +9,9 @@ export const getAllInventory = async (req, res) => {
     const query = { tailorId: req.user._id };
     if (type) query.type = type;
     if (isLowStock === "true") {
-      query.quantity = { $lte: mongoose.expr.$fromField("lowStockThreshold") };
+      query.$expr = { $lte: ["$quantity", "$lowStockThreshold"] };
+    } else if (isLowStock === "false") {
+      query.$expr = { $gt: ["$quantity", "$lowStockThreshold"] };
     }
 
     const inventory = await inventorySchema
