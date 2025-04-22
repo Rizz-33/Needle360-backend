@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { UNITS } from "../constants.js";
+import { SIZES, UNITS } from "../constants.js";
 
 const inventorySchema = new mongoose.Schema({
   tailorId: {
@@ -27,6 +27,11 @@ const inventorySchema = new mongoose.Schema({
       validator: (value) => Number.isInteger(value),
       message: "Quantity must be an integer",
     },
+  },
+  size: {
+    type: String,
+    trim: true,
+    enum: SIZES,
   },
   unit: {
     type: String,
