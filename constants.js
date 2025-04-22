@@ -32,6 +32,8 @@ const ACCESSORY_TYPES = [
 
 const UNITS = ["meters", "pieces", "rolls", "grams", "units"];
 
+const SIZES = ["small", "medium", "large", "extra-large"];
+
 const ORDER_STATUSES = ["pending", "processing", "completed", "cancelled"];
 
-export { ACCESSORY_TYPES, ORDER_STATUSES, PREDEFINED_SERVICES, UNITS };
+export { ACCESSORY_TYPES, ORDER_STATUSES, PREDEFINED_SERVICES, SIZES, UNITS };
