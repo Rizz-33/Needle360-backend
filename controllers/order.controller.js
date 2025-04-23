@@ -19,11 +19,15 @@ const sanitizeOrder = (order) => {
     orderObj.measurements &&
     typeof orderObj.measurements === "object"
   ) {
-    // Ensure measurements is an object if already converted
     orderObj.measurements = { ...orderObj.measurements };
   } else {
     orderObj.measurements = {};
   }
+
+  // Include payment fields
+  orderObj.paymentStatus = orderObj.paymentStatus || "pending";
+  orderObj.paymentMethod = orderObj.paymentMethod || null;
+  orderObj.paymentIntentId = orderObj.paymentIntentId || null;
 
   return orderObj;
 };
@@ -296,6 +300,15 @@ export const updateOrderStatus = async (req, res) => {
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
+    }
+
+    // If status is changed to completed, notify customer to initiate payment
+    if (status === "completed" && order.paymentStatus === "pending") {
+      const io = req.app.get("io");
+      io.to(`customer:${order.customerId}`).emit("orderReadyForPayment", {
+        orderId: order._id,
+        totalAmount: order.totalAmount,
+      });
     }
 
     // Emit WebSocket event for real-time update

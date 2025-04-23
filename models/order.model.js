@@ -56,6 +56,20 @@ const orderSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  paymentStatus: {
+    type: String,
+    enum: ["pending", "paid", "failed"],
+    default: "pending",
+  },
+  paymentMethod: {
+    type: String,
+    enum: ["stripe", "cod", null],
+    default: null,
+  },
+  paymentIntentId: {
+    type: String,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

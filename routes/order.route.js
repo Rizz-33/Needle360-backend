@@ -14,6 +14,10 @@ import {
   updateOrder,
   updateOrderStatus,
 } from "../controllers/order.controller.js";
+import {
+  createPaymentIntent,
+  selectCOD,
+} from "../controllers/payment.controller.js";
 import { isCustomer, isTailor } from "../middleware/auth.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 
@@ -88,6 +92,22 @@ router.post(
   isCustomer,
   customerOrderValidation,
   createOrder
+);
+
+// Payment routes
+router.post(
+  "/payment/intent",
+  verifyToken,
+  isCustomer,
+  [body("orderId").isMongoId().withMessage("Valid order ID is required")],
+  createPaymentIntent
+);
+router.post(
+  "/payment/cod",
+  verifyToken,
+  isCustomer,
+  [body("orderId").isMongoId().withMessage("Valid order ID is required")],
+  selectCOD
 );
 
 export default router;
