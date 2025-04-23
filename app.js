@@ -1,10 +1,11 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import dotenv from "dotenv";
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
+import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
-import dotenv from "dotenv";
 
 // Routes
 import adminRoutes from "./routes/admin.route.js";
@@ -88,7 +89,16 @@ app.options("*", (req, res) => {
   res.status(200).send();
 });
 
+// Parse JSON bodies
 app.use(express.json({ limit: "16mb" }));
+
+// Parse raw bodies for Stripe webhook
+app.use(
+  "/api/webhook/stripe",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook
+);
+
 app.use(cookieParser());
 
 // Connect MongoDB and start
