@@ -1,6 +1,6 @@
 import { validationResult } from "express-validator";
 import mongoose from "mongoose";
-import { ORDER_STATUSES } from "../constants.js";
+import { ORDER_ACTIONS, ORDER_STATUSES } from "../constants.js";
 import Order from "../models/order.model.js";
 
 // Helper function to properly sanitize an order for response
@@ -9,12 +9,20 @@ const sanitizeOrder = (order) => {
 
   // Convert ObjectIds to strings
   orderObj._id = orderObj._id.toString();
-  orderObj.tailorId = orderObj.tailorId.toString();
-  orderObj.customerId = orderObj.customerId.toString();
+  orderObj.tailorId = orderObj.tailorId?.toString();
+  orderObj.customerId = orderObj.customerId?.toString();
 
   // Convert Map to plain object for measurements
   if (order.measurements instanceof Map) {
     orderObj.measurements = Object.fromEntries(order.measurements);
+  } else if (
+    orderObj.measurements &&
+    typeof orderObj.measurements === "object"
+  ) {
+    // Ensure measurements is an object if already converted
+    orderObj.measurements = { ...orderObj.measurements };
+  } else {
+    orderObj.measurements = {};
   }
 
   return orderObj;
@@ -88,10 +96,27 @@ export const createOrder = async (req, res) => {
     const orderData = {
       ...req.body,
       customerId: req.user.role === 1 ? req.user._id : req.body.customerId,
-      tailorId: req.user.role === 4 ? req.user._id : req.body.tailorId,
-
-      status: "requested", // Explicitly set initial status to pending
+      tailorId:
+        req.user.role === 4
+          ? req.user._id
+          : mongoose.Types.ObjectId(req.body.tailorId), // Convert tailorId to ObjectId
+      status: "requested", // Explicitly set initial status to requested
     };
+
+    // Validate tailorId for customers
+    if (req.user.role !== 4 && !orderData.tailorId) {
+      return res
+        .status(400)
+        .json({ message: "Tailor ID is required for customers" });
+    }
+
+    // Validate that tailorId is a valid ObjectId
+    if (
+      orderData.tailorId &&
+      !mongoose.Types.ObjectId.isValid(orderData.tailorId)
+    ) {
+      return res.status(400).json({ message: "Invalid tailor ID" });
+    }
 
     const order = new Order(orderData);
     await order.save();
@@ -130,7 +155,7 @@ export const approveOrRejectOrder = async (req, res) => {
       return res.status(400).json({ message: "Invalid order ID" });
     }
 
-    // Validate action
+    // Validate action (using imported ORDER_ACTIONS)
     if (!ORDER_ACTIONS.includes(action)) {
       return res
         .status(400)
