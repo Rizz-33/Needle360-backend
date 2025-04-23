@@ -68,16 +68,14 @@ export const getOrderByCustomerId = async (req, res) => {
     res.json({ orders: sanitizedOrders, total, page, limit });
   } catch (error) {
     console.error("Error fetching customer orders:", error);
-    res
-      .status(500)
-      .json({
-        message: "Error fetching customer orders",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error fetching customer orders",
+      error: error.message,
+    });
   }
 };
 
-// Create a new order
+// Create a new order (accessible to customers and tailors)
 export const createOrder = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -89,12 +87,25 @@ export const createOrder = async (req, res) => {
 
     const orderData = {
       ...req.body,
-      tailorId: req.user._id,
-      status: "pending", // Explicitly set initial status to pending
+      customerId: req.user.role === 1 ? req.user._id : req.body.customerId,
+      tailorId: req.user.role === 4 ? req.user._id : req.body.tailorId,
+
+      status: "requested", // Explicitly set initial status to pending
     };
 
     const order = new Order(orderData);
     await order.save();
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.get("io");
+    io.to(`tailor:${order.tailorId}`).emit(
+      "orderCreated",
+      sanitizeOrder(order)
+    );
+    io.to(`customer:${order.customerId}`).emit(
+      "orderCreated",
+      sanitizeOrder(order)
+    );
 
     // Properly sanitize the order for response
     const sanitizedOrder = sanitizeOrder(order);
@@ -105,6 +116,63 @@ export const createOrder = async (req, res) => {
     res
       .status(400)
       .json({ message: "Error creating order", error: error.message });
+  }
+};
+
+// Approve or reject an order (tailor only)
+export const approveOrRejectOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action } = req.body; // action: 'approve' or 'reject'
+
+    // Validate ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid order ID" });
+    }
+
+    // Validate action
+    if (!ORDER_ACTIONS.includes(action)) {
+      return res
+        .status(400)
+        .json({ message: "Invalid action. Must be 'approve' or 'reject'" });
+    }
+
+    const order = await Order.findOne({ _id: id, tailorId: req.user._id });
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    if (order.status !== "requested") {
+      return res
+        .status(400)
+        .json({ message: "Order is not in requested status" });
+    }
+
+    // Update status based on action
+    order.status = action === "approve" ? "pending" : "cancelled";
+    await order.save();
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.get("io");
+    io.to(`tailor:${order.tailorId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
+    io.to(`customer:${order.customerId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
+
+    // Properly sanitize the order for response
+    const sanitizedOrder = sanitizeOrder(order);
+
+    res.json(sanitizedOrder);
+  } catch (error) {
+    console.error("Error approving/rejecting order:", error);
+    res.status(400).json({
+      message: "Error approving/rejecting order",
+      error: error.message,
+    });
   }
 };
 
@@ -138,7 +206,7 @@ export const updateOrder = async (req, res) => {
       {
         $set: {
           ...req.body,
-          updatedAt: Date.now(), // Always update the timestamp when changing status
+          updatedAt: Date.now(),
         },
       },
       { new: true }
@@ -147,6 +215,17 @@ export const updateOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+
+    // Emit WebSocket event for real-time update
+    const io = req.app.get("io");
+    io.to(`tailor:${order.tailorId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
+    io.to(`customer:${order.customerId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
 
     // Properly sanitize the order for response
     const sanitizedOrder = sanitizeOrder(order);
@@ -194,6 +273,17 @@ export const updateOrderStatus = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    // Emit WebSocket event for real-time update
+    const io = req.app.get("io");
+    io.to(`tailor:${order.tailorId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
+    io.to(`customer:${order.customerId}`).emit(
+      "orderStatusUpdated",
+      sanitizeOrder(order)
+    );
+
     // Properly sanitize the order for response
     const sanitizedOrder = sanitizeOrder(order);
 
@@ -224,6 +314,11 @@ export const deleteOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
+
+    // Emit WebSocket event for deletion
+    const io = req.app.get("io");
+    io.to(`tailor:${order.tailorId}`).emit("orderDeleted", { id });
+    io.to(`customer:${order.customerId}`).emit("orderDeleted", { id });
 
     res.json({ message: "Order deleted" });
   } catch (error) {
