@@ -99,7 +99,7 @@ export const createOrder = async (req, res) => {
       tailorId:
         req.user.role === 4
           ? req.user._id
-          : mongoose.Types.ObjectId(req.body.tailorId), // Convert tailorId to ObjectId
+          : new mongoose.Types.ObjectId(req.body.tailorId),
       status: "requested", // Explicitly set initial status to requested
     };
 
