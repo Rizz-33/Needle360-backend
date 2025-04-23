@@ -37,7 +37,7 @@ const orderSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ORDER_STATUSES,
-    default: "pending",
+    default: "requested",
   },
   dueDate: {
     type: Date,
