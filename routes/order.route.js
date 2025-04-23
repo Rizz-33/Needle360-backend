@@ -1,6 +1,11 @@
 import express from "express";
 import { body } from "express-validator";
 import {
+  ORDER_ACTIONS,
+  ORDER_STATUSES,
+  PREDEFINED_SERVICES,
+} from "../constants.js";
+import {
   approveOrRejectOrder,
   createOrder,
   deleteOrder,
@@ -11,19 +16,15 @@ import {
 } from "../controllers/order.controller.js";
 import { isCustomer, isTailor } from "../middleware/auth.js";
 import { verifyToken } from "../middleware/verifyToken.js";
-import { ORDER_ACTIONS, ORDER_STATUSES, PREDEFINED_SERVICES } from "../constants.js";
 
 const router = express.Router();
 
-// Validation middleware for creating/updating orders
-const orderValidation = [
-  body("tailorId").isMongoId().withMessage("Valid tailor ID is required"),
+// Base validation for creating/updating orders (shared fields)
+const baseOrderValidation = [
   body("customerContact")
     .isMobilePhone("any")
     .withMessage("Valid phone number is required"),
-  body("orderType")
-    .isIn(PREDEFINED_SERVICES)
-    .withMessage("Invalid order type"),
+  body("orderType").isIn(PREDEFINED_SERVICES).withMessage("Invalid order type"),
   body("dueDate")
     .isISO8601()
     .toDate()
@@ -34,19 +35,34 @@ const orderValidation = [
     .withMessage("Total amount must be a non-negative number"),
 ];
 
+// Validation for tailors (tailorId is optional)
+const tailorOrderValidation = [
+  ...baseOrderValidation,
+  body("tailorId")
+    .optional()
+    .isMongoId()
+    .withMessage("Valid tailor ID is required if provided"),
+];
+
+// Validation for customers (tailorId is required)
+const customerOrderValidation = [
+  ...baseOrderValidation,
+  body("tailorId")
+    .notEmpty()
+    .withMessage("Tailor ID is required")
+    .isMongoId()
+    .withMessage("Valid tailor ID is required"),
+];
+
 // Routes for order management (tailor)
 router.get("/", verifyToken, isTailor, getAllOrders);
-router.post("/", verifyToken, isTailor, orderValidation, createOrder);
-router.put("/:id", verifyToken, isTailor, orderValidation, updateOrder);
+router.post("/", verifyToken, isTailor, tailorOrderValidation, createOrder);
+router.put("/:id", verifyToken, isTailor, tailorOrderValidation, updateOrder);
 router.put(
   "/:id/status",
   verifyToken,
   isTailor,
-  [
-    body("status")
-      .isIn(ORDER_STATUSES)
-      .withMessage("Invalid status"),
-  ],
+  [body("status").isIn(ORDER_STATUSES).withMessage("Invalid status")],
   updateOrderStatus
 );
 router.delete("/:id", verifyToken, isTailor, deleteOrder);
@@ -66,6 +82,12 @@ router.put(
 
 // Routes for customers
 router.get("/customer", verifyToken, isCustomer, getOrderByCustomerId);
-router.post("/customer", verifyToken, isCustomer, orderValidation, createOrder);
+router.post(
+  "/customer",
+  verifyToken,
+  isCustomer,
+  customerOrderValidation,
+  createOrder
+);
 
 export default router;
