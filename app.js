@@ -4,6 +4,7 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import { connectToMongoDB } from "./db_connection.js";
+import dotenv from "dotenv";
 
 // Routes
 import adminRoutes from "./routes/admin.route.js";
@@ -20,6 +21,8 @@ import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
+
+dotenv.config();
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -48,6 +51,13 @@ io.on("connection", (socket) => {
   socket.on("leaveConversation", (conversationId) => {
     console.log(`Socket ${socket.id} leaving conversation: ${conversationId}`);
     socket.leave(conversationId);
+  });
+
+  // Join rooms for tailor and customer
+  socket.on("joinRoom", ({ userId, role }) => {
+    const room = `${role}:${userId}`;
+    socket.join(room);
+    console.log(`${role} ${userId} joined room: ${room}`);
   });
 
   // Handle disconnection
@@ -110,5 +120,5 @@ connectToMongoDB()
     });
   })
   .catch((error) => {
-    console.error("Failed to connect to MongoDB. Server not started.");
+    console.error("Failed to connect to MongoDB. Server not started.", error);
   });
