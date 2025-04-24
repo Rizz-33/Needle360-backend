@@ -44,11 +44,15 @@ const ORDER_STATUSES = [
 
 const ORDER_ACTIONS = ["approve", "reject"];
 
+const PAYMENT_STATUSES = ["pending", "paid", "failed", "cod"];
+
 export {
   ACCESSORY_TYPES,
+  ORDER_ACTIONS,
   ORDER_STATUSES,
+  PAYMENT_STATUSES,
   PREDEFINED_SERVICES,
+  ROLES,
   SIZES,
   UNITS,
-  ORDER_ACTIONS,
 };
