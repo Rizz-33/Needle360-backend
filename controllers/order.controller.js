@@ -104,7 +104,7 @@ export const createOrder = async (req, res) => {
         req.user.role === 4
           ? req.user._id
           : new mongoose.Types.ObjectId(req.body.tailorId),
-      status: "requested", // Explicitly set initial status to requested
+      status: "requested",
     };
 
     // Validate tailorId for customers
@@ -152,14 +152,14 @@ export const createOrder = async (req, res) => {
 export const approveOrRejectOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { action } = req.body; // action: 'approve' or 'reject'
+    const { action } = req.body;
 
     // Validate ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid order ID" });
     }
 
-    // Validate action (using imported ORDER_ACTIONS)
+    // Validate action
     if (!ORDER_ACTIONS.includes(action)) {
       return res
         .status(400)

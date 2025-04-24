@@ -1,6 +1,10 @@
 import mongoose from "mongoose";
 import validator from "validator";
-import { ORDER_STATUSES, PREDEFINED_SERVICES } from "../constants.js";
+import {
+  ORDER_STATUSES,
+  PAYMENT_STATUSES,
+  PREDEFINED_SERVICES,
+} from "../constants.js";
 
 const orderSchema = new mongoose.Schema({
   tailorId: {
@@ -58,7 +62,7 @@ const orderSchema = new mongoose.Schema({
   },
   paymentStatus: {
     type: String,
-    enum: ["pending", "paid", "failed"],
+    enum: PAYMENT_STATUSES,
     default: "pending",
   },
   paymentMethod: {

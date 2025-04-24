@@ -6,6 +6,46 @@ dotenv.config();
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Update payment status controller
+export const updatePaymentStatus = async (
+  orderId,
+  paymentStatus,
+  paymentMethod = null
+) => {
+  try {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new Error("Order not found");
+    }
+
+    order.paymentStatus = paymentStatus;
+    if (paymentMethod) {
+      order.paymentMethod = paymentMethod;
+    }
+    await order.save();
+
+    // Emit WebSocket event
+    const io = global.io; // Assuming io is attached to global or passed via app
+    if (io) {
+      io.to(`tailor:${order.tailorId}`).emit("paymentStatusUpdated", {
+        orderId: order._id,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+      });
+      io.to(`customer:${order.customerId}`).emit("paymentStatusUpdated", {
+        orderId: order._id,
+        paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+      });
+    }
+
+    return order;
+  } catch (error) {
+    console.error("Error updating payment status:", error);
+    throw error;
+  }
+};
+
 // Create a Stripe Payment Intent for an order
 export const createPaymentIntent = async (req, res) => {
   try {
@@ -19,8 +59,10 @@ export const createPaymentIntent = async (req, res) => {
     if (order.status !== "completed") {
       return res.status(400).json({ message: "Order is not completed" });
     }
-    if (order.paymentStatus === "paid") {
-      return res.status(400).json({ message: "Order is already paid" });
+    if (order.paymentStatus === "paid" || order.paymentStatus === "cod") {
+      return res
+        .status(400)
+        .json({ message: "Order is already paid or set to COD" });
     }
 
     // Create Payment Intent
@@ -63,29 +105,16 @@ export const selectCOD = async (req, res) => {
     if (order.status !== "completed") {
       return res.status(400).json({ message: "Order is not completed" });
     }
-    if (order.paymentStatus === "paid") {
-      return res.status(400).json({ message: "Order is already paid" });
+    if (order.paymentStatus === "paid" || order.paymentStatus === "cod") {
+      return res
+        .status(400)
+        .json({ message: "Order is already paid or set to COD" });
     }
 
-    // Update order with COD
-    order.paymentMethod = "cod";
-    order.paymentStatus = "pending";
-    await order.save();
+    // Update payment status to cod
+    const updatedOrder = await updatePaymentStatus(orderId, "cod", "cod");
 
-    // Emit WebSocket event
-    const io = req.app.get("io");
-    io.to(`tailor:${order.tailorId}`).emit("paymentStatusUpdated", {
-      orderId: order._id,
-      paymentStatus: order.paymentStatus,
-      paymentMethod: order.paymentMethod,
-    });
-    io.to(`customer:${order.customerId}`).emit("paymentStatusUpdated", {
-      orderId: order._id,
-      paymentStatus: order.paymentStatus,
-      paymentMethod: order.paymentMethod,
-    });
-
-    res.json({ message: "COD selected successfully", order });
+    res.json({ message: "COD selected successfully", order: updatedOrder });
   } catch (error) {
     console.error("Error selecting COD:", error);
     res.status(500).json({
@@ -103,8 +132,8 @@ export const handleStripeWebhook = async (req, res) => {
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
-      sig
-      //process.env.STRIPE_WEBHOOK_SECRET
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (error) {
     console.error("Webhook signature verification failed:", error);
@@ -120,52 +149,17 @@ export const handleStripeWebhook = async (req, res) => {
       const orderId = paymentIntent.metadata.orderId;
 
       try {
-        const order = await Order.findById(orderId);
-        if (order) {
-          order.paymentStatus = "paid";
-          order.paymentMethod = "stripe";
-          await order.save();
-
-          // Emit WebSocket event
-          const io = req.app.get("io");
-          io.to(`tailor:${order.tailorId}`).emit("paymentStatusUpdated", {
-            orderId: order._id,
-            paymentStatus: order.paymentStatus,
-            paymentMethod: order.paymentMethod,
-          });
-          io.to(`customer:${order.customerId}`).emit("paymentStatusUpdated", {
-            orderId: order._id,
-            paymentStatus: order.paymentStatus,
-            paymentMethod: order.paymentMethod,
-          });
-        }
+        await updatePaymentStatus(orderId, "paid", "stripe");
       } catch (error) {
         console.error("Error updating order after payment:", error);
       }
       break;
     case "payment_intent.payment_failed":
-      // Handle failed payment
       const failedPaymentIntent = event.data.object;
       const failedOrderId = failedPaymentIntent.metadata.orderId;
-      try {
-        const order = await Order.findById(failedOrderId);
-        if (order) {
-          order.paymentStatus = "failed";
-          await order.save();
 
-          // Emit WebSocket event
-          const io = req.app.get("io");
-          io.to(`tailor:${order.tailorId}`).emit("paymentStatusUpdated", {
-            orderId: order._id,
-            paymentStatus: order.paymentStatus,
-            paymentMethod: order.paymentMethod,
-          });
-          io.to(`customer:${order.customerId}`).emit("paymentStatusUpdated", {
-            orderId: order._id,
-            paymentStatus: order.paymentStatus,
-            paymentMethod: order.paymentMethod,
-          });
-        }
+      try {
+        await updatePaymentStatus(failedOrderId, "failed");
       } catch (error) {
         console.error("Error handling failed payment:", error);
       }
