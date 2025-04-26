@@ -31,7 +31,6 @@ jobs:
   deploy:
     needs: build
     runs-on: self-hosted
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # Deploy only on main
     steps:
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
