@@ -22,16 +22,11 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: |
-            rizz336/needle360-backend:latest
-            rizz336/needle360-backend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Build Docker Image
+        run: docker build -t rizz336/needle360-backend .
+
+      - name: Push Docker Image
+        run: docker push rizz336/needle360-backend:latest
 
   deploy:
     needs: build
