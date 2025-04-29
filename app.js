@@ -28,7 +28,12 @@ import userInteractionsRoutes from "./routes/user-interactions.route.js";
 dotenv.config();
 
 // Validate critical environment variables
-const requiredEnvVars = ["PORT", "CLIENT_URL"];
+const requiredEnvVars = [
+  "PORT",
+  "CLIENT_URL",
+  "MONGODB_PASSWORD",
+  "STRIPE_SECRET_KEY",
+];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
 );
@@ -47,19 +52,21 @@ const httpServer = http.createServer(app);
 // Define allowed origins for CORS and Socket.IO
 const allowedOrigins = [
   process.env.CLIENT_URL,
+  "http://172.20.10.5:5173", // Added frontend origin
   "http://13.61.16.74:5173",
   "http://13.61.16.74:4000",
-  "http://localhost:5173", // For local development
-].filter(Boolean); // Remove undefined or null values
+  "http://localhost:5173",
+].filter(Boolean);
 
 // Socket.IO initialization
 export const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps or curl) or from allowed origins
+      // Allow requests with no origin (e.g., mobile apps) or from allowed origins
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`Blocked CORS request from origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -73,26 +80,22 @@ app.set("io", io);
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
-  // Join a conversation room
   socket.on("joinConversation", (conversationId) => {
     console.log(`Socket ${socket.id} joining conversation: ${conversationId}`);
     socket.join(conversationId);
   });
 
-  // Leave a conversation room
   socket.on("leaveConversation", (conversationId) => {
     console.log(`Socket ${socket.id} leaving conversation: ${conversationId}`);
     socket.leave(conversationId);
   });
 
-  // Join rooms for tailor and customer
   socket.on("joinRoom", ({ userId, role }) => {
     const room = `${role}:${userId}`;
     socket.join(room);
     console.log(`${role} ${userId} joined room: ${room}`);
   });
 
-  // Handle disconnection
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
   });
@@ -104,10 +107,10 @@ const port = process.env.PORT || 4000;
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin or from allowed origins
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn(`Blocked CORS request from origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -135,7 +138,6 @@ app.use(cookieParser());
 // Connect MongoDB and start server
 connectToMongoDB()
   .then(() => {
-    // API Routes
     app.use("/api/auth", authRoutes);
     app.use("/api/tailor", tailorRoutes);
     app.use("/api/admin", adminRoutes);
@@ -151,21 +153,17 @@ connectToMongoDB()
     app.use("/api/inventory", inventoryRoutes);
     app.use("/api/order", orderRoutes);
 
-    // Serve static files from the frontend build directory
     const frontendBuildPath = path.join(__dirname, "../frontend/dist");
     app.use(express.static(frontendBuildPath));
 
-    // API health check endpoint
     app.get("/api", (req, res) => {
       res.json({ message: "API server is up and running" });
     });
 
-    // Handle all other requests with the React app
     app.get("*", (req, res) => {
       res.sendFile(path.join(frontendBuildPath, "index.html"));
     });
 
-    // Start HTTP + Socket.IO server
     httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Server is running on port ${port}`);
       console.log(`Serving frontend from ${frontendBuildPath}`);
