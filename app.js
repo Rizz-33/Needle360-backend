@@ -40,8 +40,8 @@ export const io = new Server(httpServer, {
     // Allow multiple origins for Socket.IO connections
     origin: [
       process.env.CLIENT_URL || "http://localhost:5173",
-      `http://13.61.16.74/:5173`,
-      `http://13.61.16.74/:4000`,
+      `http://13.61.16.74:5173`,
+      `http://13.61.16.74:4000`,
     ],
     methods: ["GET", "POST"],
     credentials: true,
@@ -86,8 +86,8 @@ app.use(
     // Allow multiple origins for API requests
     origin: [
       process.env.CLIENT_URL || "http://localhost:5173",
-      `http://13.61.16.74/:5173`,
-      `http://13.61.16.74/:4000`,
+      `http://13.61.16.74:5173`,
+      `http://13.61.16.74:4000`,
     ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
