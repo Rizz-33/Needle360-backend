@@ -22,16 +22,29 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker Image
-        run: docker build -t rizz336/needle360-backend .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Push Docker Image
-        run: docker push rizz336/needle360-backend:latest
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: rizz336/needle360-backend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: build
     runs-on: self-hosted
     steps:
+      - name: Clean Up Docker Environment
+        run: |
+          docker system prune -f
+          docker image prune -a -f
+          docker builder prune -f
+        continue-on-error: true
+
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
 
@@ -46,4 +59,6 @@ jobs:
           docker run -d -p 4000:4000 --name needle360-backend-container \
             -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' \
             -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
+            -e PORT=4000 \
+            -e CLIENT_URL='${{ secrets.CLIENT_URL }}' \
             rizz336/needle360-backend:latest
