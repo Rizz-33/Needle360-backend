@@ -52,10 +52,15 @@ const httpServer = http.createServer(app);
 // Define allowed origins for CORS and Socket.IO
 const allowedOrigins = [
   process.env.CLIENT_URL,
-  "http://172.20.10.5:5173", // Added frontend origin
+  "http://172.20.10.5:5173",
   "http://13.61.16.74:5173",
+  "http://172.20.10.5:4000",
   "http://13.61.16.74:4000",
   "http://localhost:5173",
+  // Add these lines to allow all devices on your network
+  /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Local network IPs
+  /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/, // Local network IPs
+  /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/, // Local network IPs
 ].filter(Boolean);
 
 // Socket.IO initialization
