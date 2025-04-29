@@ -27,6 +27,16 @@ import userInteractionsRoutes from "./routes/user-interactions.route.js";
 
 dotenv.config();
 
+// Validate critical environment variables
+const requiredEnvVars = ["PORT", "CLIENT_URL"];
+const missingEnvVars = requiredEnvVars.filter(
+  (varName) => !process.env[varName]
+);
+if (missingEnvVars.length > 0) {
+  console.error(`Missing environment variables: ${missingEnvVars.join(", ")}`);
+  process.exit(1);
+}
+
 // Set up __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,15 +44,25 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = http.createServer(app);
 
+// Define allowed origins for CORS and Socket.IO
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "http://13.61.16.74:5173",
+  "http://13.61.16.74:4000",
+  "http://localhost:5173", // For local development
+].filter(Boolean); // Remove undefined or null values
+
 // Socket.IO initialization
 export const io = new Server(httpServer, {
   cors: {
-    // Allow multiple origins for Socket.IO connections
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      `http://13.61.16.74:5173`,
-      `http://13.61.16.74:4000`,
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (e.g., mobile apps or curl) or from allowed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -83,12 +103,14 @@ const port = process.env.PORT || 4000;
 // CORS configuration for HTTP requests
 app.use(
   cors({
-    // Allow multiple origins for API requests
-    origin: [
-      process.env.CLIENT_URL || "http://localhost:5173",
-      `http://13.61.16.74:5173`,
-      `http://13.61.16.74:4000`,
-    ],
+    origin: (origin, callback) => {
+      // Allow requests with no origin or from allowed origins
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -96,14 +118,7 @@ app.use(
 );
 
 // Preflight request handling
-app.options("*", (req, res) => {
-  res.header(
-    "Access-Control-Allow-Methods",
-    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-  );
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.status(200).send();
-});
+app.options("*", cors());
 
 // Parse JSON bodies
 app.use(express.json({ limit: "16mb" }));
@@ -117,7 +132,7 @@ app.use(
 
 app.use(cookieParser());
 
-// Connect MongoDB and start
+// Connect MongoDB and start server
 connectToMongoDB()
   .then(() => {
     // API Routes
@@ -137,22 +152,20 @@ connectToMongoDB()
     app.use("/api/order", orderRoutes);
 
     // Serve static files from the frontend build directory
-    // Update the path to where your React build files are located
     const frontendBuildPath = path.join(__dirname, "../frontend/dist");
     app.use(express.static(frontendBuildPath));
 
     // API health check endpoint
     app.get("/api", (req, res) => {
-      res.send("API server is up and running");
+      res.json({ message: "API server is up and running" });
     });
 
     // Handle all other requests with the React app
-    // This must be after API routes to avoid catching API calls
     app.get("*", (req, res) => {
       res.sendFile(path.join(frontendBuildPath, "index.html"));
     });
 
-    // Start HTTP + Socket.IO server, binding to all interfaces (0.0.0.0)
+    // Start HTTP + Socket.IO server
     httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Server is running on port ${port}`);
       console.log(`Serving frontend from ${frontendBuildPath}`);
@@ -160,4 +173,5 @@ connectToMongoDB()
   })
   .catch((error) => {
     console.error("Failed to connect to MongoDB. Server not started.", error);
+    process.exit(1);
   });
