@@ -37,7 +37,12 @@ const httpServer = http.createServer(app);
 // Socket.IO initialization
 export const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    // Allow multiple origins for Socket.IO connections
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:5173",
+      `http://13.61.16.74/:5173`,
+      `http://13.61.16.74/:4000`,
+    ],
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -75,10 +80,15 @@ io.on("connection", (socket) => {
 
 const port = process.env.PORT || 4000;
 
-// CORS
+// CORS configuration for HTTP requests
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    // Allow multiple origins for API requests
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:5173",
+      `http://13.61.16.74/:5173`,
+      `http://13.61.16.74/:4000`,
+    ],
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -142,8 +152,8 @@ connectToMongoDB()
       res.sendFile(path.join(frontendBuildPath, "index.html"));
     });
 
-    // Start HTTP + Socket.IO server
-    httpServer.listen(port, () => {
+    // Start HTTP + Socket.IO server, binding to all interfaces (0.0.0.0)
+    httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Server is running on port ${port}`);
       console.log(`Serving frontend from ${frontendBuildPath}`);
     });
