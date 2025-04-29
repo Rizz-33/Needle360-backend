@@ -167,6 +167,15 @@ connectToMongoDB()
       res.json({ message: "API server is up and running" });
     });
 
+    // Add this before httpServer.listen()
+    app.get("/", (req, res) => {
+      res.json({
+        message: "Welcome to Needle360 Backend",
+        api_docs: "http://13.61.16.74:4000/api",
+        frontend: "http://13.61.16.74:5173",
+      });
+    });
+
     httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Backend server is running on port ${port}`);
     });
