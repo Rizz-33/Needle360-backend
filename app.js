@@ -3,9 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
-import path from "path";
 import { Server } from "socket.io";
-import { fileURLToPath } from "url";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 
@@ -42,10 +40,6 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Set up __dirname equivalent for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const httpServer = http.createServer(app);
 
@@ -64,7 +58,6 @@ const allowedOrigins = [
 export const io = new Server(httpServer, {
   cors: {
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps) or from allowed origins
       if (
         !origin ||
         allowedOrigins.some((allowed) =>
@@ -169,20 +162,13 @@ connectToMongoDB()
     app.use("/api/inventory", inventoryRoutes);
     app.use("/api/order", orderRoutes);
 
-    const frontendBuildPath = path.join(__dirname, "../frontend/dist");
-    app.use(express.static(frontendBuildPath));
-
+    // API health check
     app.get("/api", (req, res) => {
       res.json({ message: "API server is up and running" });
     });
 
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(frontendBuildPath, "index.html"));
-    });
-
     httpServer.listen(port, "0.0.0.0", () => {
-      console.log(`Server is running on port ${port}`);
-      console.log(`Serving frontend from ${frontendBuildPath}`);
+      console.log(`Backend server is running on port ${port}`);
     });
   })
   .catch((error) => {
