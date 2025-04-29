@@ -3,7 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
 import http from "http";
+import path from "path";
 import { Server } from "socket.io";
+import { fileURLToPath } from "url";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 
@@ -24,6 +26,10 @@ import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
 
 dotenv.config();
+
+// Set up __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -104,11 +110,7 @@ app.use(cookieParser());
 // Connect MongoDB and start
 connectToMongoDB()
   .then(() => {
-    app.get("/", (req, res) => {
-      res.send("Server is up and running");
-    });
-
-    // Route usage
+    // API Routes
     app.use("/api/auth", authRoutes);
     app.use("/api/tailor", tailorRoutes);
     app.use("/api/admin", adminRoutes);
@@ -124,9 +126,26 @@ connectToMongoDB()
     app.use("/api/inventory", inventoryRoutes);
     app.use("/api/order", orderRoutes);
 
+    // Serve static files from the frontend build directory
+    // Update the path to where your React build files are located
+    const frontendBuildPath = path.join(__dirname, "../frontend/dist");
+    app.use(express.static(frontendBuildPath));
+
+    // API health check endpoint
+    app.get("/api", (req, res) => {
+      res.send("API server is up and running");
+    });
+
+    // Handle all other requests with the React app
+    // This must be after API routes to avoid catching API calls
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(frontendBuildPath, "index.html"));
+    });
+
     // Start HTTP + Socket.IO server
     httpServer.listen(port, () => {
       console.log(`Server is running on port ${port}`);
+      console.log(`Serving frontend from ${frontendBuildPath}`);
     });
   })
   .catch((error) => {
