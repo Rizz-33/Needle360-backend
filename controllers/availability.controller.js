@@ -103,11 +103,9 @@ export const getTailorAvailability = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    // Format the time - don't attempt to use toTimeString since the values are already strings
     const formattedAvailability =
       tailor.availability?.map((slot) => ({
         ...slot,
-        // Keep the time values as they are since they're already in HH:MM format
         from: slot.from,
         to: slot.to,
       })) || [];
@@ -174,7 +172,8 @@ export const createBulkAvailability = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.status(201).json({ slots: newSlots });
+    // Return the full list of availability slots
+    res.status(201).json({ slots: tailor.availability });
   } catch (error) {
     console.error("Error creating bulk availability:", error);
     res.status(500).json({
@@ -205,7 +204,8 @@ export const updateBulkAvailability = async (req, res) => {
       if (!validation.isValid) {
         return res.status(400).json({ message: validation.message });
       }
-      if (!update.id) {
+      if (!update._id) {
+        // Changed from update.id to update._id to match the frontend
         return res
           .status(400)
           .json({ message: "Slot ID is required for updates" });
@@ -217,7 +217,7 @@ export const updateBulkAvailability = async (req, res) => {
       updateOne: {
         filter: {
           _id: new mongoose.Types.ObjectId(id),
-          "availability._id": update.id,
+          "availability._id": update._id, // Changed from update.id to update._id
         },
         update: {
           $set: {
@@ -236,7 +236,7 @@ export const updateBulkAvailability = async (req, res) => {
     const result = await db.collection("users").bulkWrite(bulkOps);
     console.log("Bulk write result:", result);
 
-    // Verify the update by fetching the updated document
+    // Fetch the updated document
     const updatedTailor = await db
       .collection("users")
       .findOne(
@@ -251,7 +251,7 @@ export const updateBulkAvailability = async (req, res) => {
     res.json({
       success: true,
       modifiedCount: result.modifiedCount,
-      slots: updatedTailor.availability,
+      slots: updatedTailor.availability, // Return the full list of slots
     });
   } catch (error) {
     console.error("Error updating bulk availability:", error);
@@ -287,13 +287,13 @@ export const deleteBulkAvailability = async (req, res) => {
       { returnDocument: "after" }
     );
 
-    // In newer versions of MongoDB, the result structure has changed
     const tailor = result.value || result;
 
     if (!tailor) {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
+    // Return the full list of remaining slots
     res.json({
       message: "Slots deleted successfully",
       slots: tailor.availability,
