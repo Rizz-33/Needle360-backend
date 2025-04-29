@@ -53,7 +53,8 @@ const httpServer = http.createServer(app);
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5173",
-  "http://172.20.10.5:5173", // Local network IP for frontend
+  "http://172.20.10.5:5173",
+  "http://13.61.16.74:5173",
   /^http:\/\/192\.168\.\d+\.\d+:\d+$/, // Local network IPs
   /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/, // Local network IPs
   /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/, // Local network IPs
