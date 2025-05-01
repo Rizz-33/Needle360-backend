@@ -40,9 +40,16 @@ jobs:
     steps:
       - name: Clean Up Docker Environment
         run: |
-          docker system prune -f
-          docker image prune -a -f
-          docker builder prune -f
+          # More aggressive cleanup to free disk space
+          docker system prune -af --volumes
+          docker image prune -af
+          docker builder prune -af
+
+          # Clean npm cache that's causing disk space issues
+          rm -rf /root/.npm/_cacache || true
+
+          # Display available disk space
+          df -h
         continue-on-error: true
 
       - name: Pull Docker Image
