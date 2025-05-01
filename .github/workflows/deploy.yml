@@ -61,4 +61,9 @@ jobs:
             -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
             -e PORT=4000 \
             -e CLIENT_URL='${{ secrets.CLIENT_URL }}' \
+            -e NODE_ENV=production \
+            --restart unless-stopped \
             rizz336/needle360-backend:latest
+
+      - name: Verify Container Running
+        run: docker ps | grep needle360-backend-container
