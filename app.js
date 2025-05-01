@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 
-// Routes
+// Routes imported from their respective files
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
