@@ -31,6 +31,7 @@ const requiredEnvVars = [
   "CLIENT_URL",
   "MONGODB_PASSWORD",
   "STRIPE_SECRET_KEY",
+  "JWT_SECRET",
 ];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
