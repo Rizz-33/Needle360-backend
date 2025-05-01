@@ -41,21 +41,25 @@ export const authenticate = (req, res, next) => {
 const extractToken = (req) => {
   // Check authorization header
   const authHeader = req.headers.authorization;
+  console.log("Auth Header:", authHeader); // Debug log
   if (authHeader && authHeader.startsWith("Bearer ")) {
     return authHeader.split(" ")[1];
   }
 
   // Check x-access-token header
+  console.log("X-Access-Token:", req.headers["x-access-token"]); // Debug log
   if (req.headers["x-access-token"]) {
     return req.headers["x-access-token"];
   }
 
   // Check cookies
+  console.log("Cookies:", req.cookies); // Debug log
   if (req.cookies && req.cookies.token) {
     return req.cookies.token;
   }
 
   // No token found
+  console.log("No token found"); // Debug log
   return null;
 };
 
