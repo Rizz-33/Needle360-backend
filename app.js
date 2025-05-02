@@ -7,7 +7,7 @@ import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 
-// Routes
+// Routes imported from their respective files
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
@@ -31,6 +31,7 @@ const requiredEnvVars = [
   "CLIENT_URL",
   "MONGODB_PASSWORD",
   "STRIPE_SECRET_KEY",
+  "JWT_SECRET",
 ];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]

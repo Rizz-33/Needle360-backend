@@ -69,6 +69,7 @@ jobs:
             -e PORT=4000 \
             -e CLIENT_URL='${{ secrets.CLIENT_URL }}' \
             -e NODE_ENV=production \
+            -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
             --restart unless-stopped \
             rizz336/needle360-backend:latest
 
