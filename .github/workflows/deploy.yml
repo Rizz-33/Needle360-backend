@@ -40,15 +40,10 @@ jobs:
     steps:
       - name: Clean Up Docker Environment
         run: |
-          # More aggressive cleanup to free disk space
           docker system prune -af --volumes
           docker image prune -af
           docker builder prune -af
-
-          # Clean npm cache that's causing disk space issues
           rm -rf /root/.npm/_cacache || true
-
-          # Display available disk space
           df -h
         continue-on-error: true
 
@@ -63,11 +58,13 @@ jobs:
 
       - name: Run Docker Container
         run: |
-          docker run -d -p 4000:4000 --name needle360-backend-container \
+          docker run -d \
+            -p 4000:4000 \
+            --name needle360-backend-container \
             -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' \
             -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
             -e PORT=4000 \
-            -e CLIENT_URL='${{ secrets.CLIENT_URL }}' \
+            -e CLIENT_URL='https://needle360.online' \
             -e NODE_ENV=production \
             -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
             --restart unless-stopped \
