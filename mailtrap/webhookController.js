@@ -3,7 +3,7 @@ import { validateMailtrapWebhook } from "./mailtrapMiddleware.js";
 
 const router = express.Router();
 
-router.post("/mailtrap-webhook", validateMailtrapWebhook, async (req, res) => {
+router.post("/", validateMailtrapWebhook, async (req, res) => {
   try {
     const event = req.body;
 
