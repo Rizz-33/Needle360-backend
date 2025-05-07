@@ -20,14 +20,6 @@ const tailorShopOwnerSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    bankAccountNumber: {
-      type: String,
-      required: true,
-    },
-    bankName: {
-      type: String,
-      required: true,
-    },
     logoUrl: {
       type: String,
       required: true,
