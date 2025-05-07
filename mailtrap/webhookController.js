@@ -1,5 +1,5 @@
 import express from "express";
-import { validateMailtrapWebhook } from "./middleware/mailtrapMiddleware.js";
+import { validateMailtrapWebhook } from "./mailtrapMiddleware.js";
 
 const router = express.Router();
 

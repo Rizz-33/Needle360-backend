@@ -8,6 +8,7 @@ import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 
 // Routes imported from their respective files
+import webhookRoutes from "./mailtrap/webhookController.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
@@ -167,6 +168,7 @@ connectToMongoDB()
     app.use("/api/review", reviewRoutes);
     app.use("/api/inventory", inventoryRoutes);
     app.use("/api/order", orderRoutes);
+    app.use("/api/mailtrap-webhook", webhookRoutes);
 
     // API health check
     app.get("/api", (req, res) => {
