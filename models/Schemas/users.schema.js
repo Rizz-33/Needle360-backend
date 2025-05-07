@@ -58,14 +58,6 @@ const userSchema = new mongoose.Schema(
       ],
       default: [],
     },
-    bankAccountNumber: {
-      type: String,
-      required: true,
-    },
-    bankName: {
-      type: String,
-      required: true,
-    },
     privileges: {
       type: [String],
       default: [],

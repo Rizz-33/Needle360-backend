@@ -1,6 +1,5 @@
 import bcryptjs from "bcryptjs";
 import crypto from "crypto";
-import { console } from "inspector";
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
 import {
@@ -17,7 +16,6 @@ const generateRegistrationNumber = async (db, role) => {
   if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
   else if (role === ROLES.USER) prefix = "C"; // Customer
 
-  // Find the highest existing registration number with this prefix
   const highestRegUser = await db
     .collection("users")
     .find({ registrationNumber: new RegExp(`^${prefix}`) })
@@ -25,11 +23,11 @@ const generateRegistrationNumber = async (db, role) => {
     .limit(1)
     .toArray();
 
-  let nextNumber = 10000; // Start with 10000 (will become 5-digit number)
+  let nextNumber = 10000;
 
   if (highestRegUser.length > 0) {
     const lastRegNumber = highestRegUser[0].registrationNumber;
-    const lastSequence = parseInt(lastRegNumber.substring(1)); // Skip the prefix
+    const lastSequence = parseInt(lastRegNumber.substring(1));
     nextNumber = lastSequence + 1;
   }
 
@@ -48,43 +46,34 @@ export const signup = async (req, res) => {
       shopName,
       shopAddress,
       logoUrl,
-      bankAccountNumber,
-      bankName,
     } = req.body;
 
-    // Check for missing required fields
     if (!email || !password || !name || !role) {
-      return res.status(400).send({ message: "Missing required fields." });
+      return res.status(400).json({
+        success: false,
+        message: "Please fill in all required fields.",
+        source: "signup",
+      });
     }
 
-    // Validate role-specific fields
     const validateFields = (role) => {
       const missingFields = [];
-
-      // Check if role is valid
       if (![ROLES.TAILOR_SHOP_OWNER, ROLES.USER, ROLES.ADMIN].includes(role)) {
         return ["Invalid role"];
       }
 
       switch (role) {
         case ROLES.TAILOR_SHOP_OWNER:
-          [
-            "contactNumber",
-            "shopName",
-            "shopAddress",
-            "logoUrl",
-            "bankAccountNumber",
-            "bankName",
-          ].forEach((field) => {
-            if (!req.body[field]) missingFields.push(field);
-          });
-          break;
-        case ROLES.USER:
-          ["contactNumber", "address", "bankAccountNumber", "bankName"].forEach(
+          ["contactNumber", "shopName", "shopAddress", "logoUrl"].forEach(
             (field) => {
               if (!req.body[field]) missingFields.push(field);
             }
           );
+          break;
+        case ROLES.USER:
+          ["contactNumber", "address"].forEach((field) => {
+            if (!req.body[field]) missingFields.push(field);
+          });
           break;
         case ROLES.ADMIN:
           break;
@@ -94,47 +83,52 @@ export const signup = async (req, res) => {
 
     const missingFields = validateFields(role);
     if (missingFields.length > 0) {
-      return res.status(400).send({
-        message: `Missing required fields: ${missingFields.join(", ")}`,
+      return res.status(400).json({
+        success: false,
+        message: `Please provide the following: ${missingFields.join(", ")}.`,
+        source: "signup",
       });
     }
 
-    // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return res.status(400).send({ message: "Invalid email format." });
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+        source: "signup",
+      });
     }
 
-    // Password validation
     if (password.length < 8) {
-      return res
-        .status(400)
-        .send({ message: "Password must be at least 8 characters long." });
+      return res.status(400).json({
+        success: false,
+        message: "Your password must be at least 8 characters long.",
+        source: "signup",
+      });
     }
-
-    console.log("All fields are present and validated.");
 
     const db = mongoose.connection.db;
-
-    // Check if the user already exists
     const existingUser = await db
       .collection("users")
       .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
-    // Generate a unique registration number
-    const registrationNumber = await generateRegistrationNumber(db, role);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered.",
+        source: "signup",
+      });
+    }
 
-    // Hash password and prepare user data
+    const registrationNumber = await generateRegistrationNumber(db, role);
     const hashedPassword = await bcryptjs.hash(password, 12);
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+    const verificationTokenExpires = Date.now() + 3600000;
 
-    // Determine isApproved based on role
     const isApproved = role === ROLES.USER ? true : false;
 
-    // Prepare the user object based on role
     const user = {
       email,
       password: hashedPassword,
@@ -151,24 +145,18 @@ export const signup = async (req, res) => {
         shopAddress,
         shopRegistrationNumber: registrationNumber,
         logoUrl,
-        bankAccountNumber,
-        bankName,
       }),
       ...(role === ROLES.USER && {
         contactNumber,
         address,
-        bankAccountNumber,
-        bankName,
       }),
     };
 
-    // Insert the user into the collection
     const result = await db.collection("users").insertOne(user);
     if (!result.acknowledged || !result.insertedId) {
-      throw new Error("Failed to insert user into database");
+      throw new Error("Failed to create account in database");
     }
 
-    // Send verification email
     try {
       await sendVerificationEmail(email, verificationToken);
     } catch (emailError) {
@@ -179,27 +167,40 @@ export const signup = async (req, res) => {
       } else {
         await db.collection("users").deleteOne({ _id: result.insertedId });
         throw new Error(
-          `Failed to send verification email: ${emailError.message}`
+          "We couldn’t send the verification email. Please try again later."
         );
       }
     }
 
-    // Generate token and set cookie
     generateTokenAndSetCookie(res, result.insertedId);
 
-    res.status(201).send({
-      message: "User created successfully!",
+    res.status(201).json({
+      success: true,
+      message: "Account created successfully! Please verify your email.",
       user: {
-        ...user,
-        password: null,
         _id: result.insertedId,
+        email,
+        name,
+        role,
+        isApproved,
+        registrationNumber,
+        contactNumber: user.contactNumber,
+        address: user.address,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopRegistrationNumber: user.shopRegistrationNumber,
+        logoUrl: user.logoUrl,
       },
+      source: "signup",
     });
   } catch (error) {
-    console.error("Signup error:", error);
-    res
-      .status(500)
-      .send({ message: "Error during signup", error: error.message });
+    console.error("Signup error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong during signup. Please try again later.",
+      source: "signup",
+      error: error.message,
+    });
   }
 };
 
@@ -208,48 +209,27 @@ export const verifyEmail = async (req, res) => {
     const { code } = req.body;
 
     if (!code) {
-      return res
-        .status(400)
-        .send({ message: "Verification code is required." });
+      return res.status(400).json({
+        success: false,
+        message: "Please enter the verification code.",
+        source: "verifyEmail",
+      });
     }
-
-    console.log("Attempting to verify with code:", code);
 
     const db = mongoose.connection.db;
-
-    // Log the user we're trying to find for debugging
-    const userCount = await db.collection("users").countDocuments({
-      verificationToken: code.toString(),
-    });
-
-    console.log(`Found ${userCount} users with this verification token`);
-
-    // Check if token is expired
-    const expiredCount = await db.collection("users").countDocuments({
-      verificationToken: code.toString(),
-      verificationTokenExpires: { $lte: Date.now() },
-    });
-
-    if (expiredCount > 0) {
-      console.log("Found user but token has expired");
-    }
-
-    // Find the user with the verification token
     const user = await db.collection("users").findOne({
       verificationToken: code.toString(),
       verificationTokenExpires: { $gt: Date.now() },
     });
 
     if (!user) {
-      console.log("No valid user found with the provided code");
-      return res
-        .status(400)
-        .send({ message: "Invalid or expired verification code." });
+      return res.status(400).json({
+        success: false,
+        message: "The verification code is invalid or has expired.",
+        source: "verifyEmail",
+      });
     }
 
-    console.log("Found valid user to verify:", user.email);
-
-    // Update user details
     await db.collection("users").updateOne(
       { _id: user._id },
       {
@@ -258,26 +238,42 @@ export const verifyEmail = async (req, res) => {
       }
     );
 
-    console.log("User successfully verified");
-
-    // Send welcome email
     try {
       await sendWelcomeEmail(user.email, user.name);
-      console.log("Welcome email sent successfully");
     } catch (emailError) {
       console.warn("Failed to send welcome email:", emailError.message);
     }
 
+    // Construct user response without password
+    const userResponse = {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isVerified: true,
+      registrationNumber: user.registrationNumber,
+      contactNumber: user.contactNumber,
+      address: user.address,
+      shopName: user.shopName,
+      shopAddress: user.shopAddress,
+      shopRegistrationNumber: user.shopRegistrationNumber,
+      logoUrl: user.logoUrl,
+    };
+
     res.status(200).json({
-      message: "Email verified successfully!",
-      user: {
-        ...user,
-        password: undefined,
-      },
+      success: true,
+      message: "Email verified successfully! Welcome aboard!",
+      user: userResponse,
+      source: "verifyEmail",
     });
   } catch (error) {
-    console.error("Email verification error:", error);
-    res.status(500).send({ message: "Internal server error." });
+    console.error("Email verification error:", error.message);
+    res.status(500).json({
+      success: false,
+      message:
+        "Something went wrong while verifying your email. Please try again later.",
+      source: "verifyEmail",
+    });
   }
 };
 
@@ -285,60 +281,84 @@ export const login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).send({ message: "Missing email or password." });
+    return res.status(400).json({
+      success: false,
+      message: "Please enter your email and password.",
+      source: "login",
+    });
   }
 
   try {
     const db = mongoose.connection.db;
-
-    // Check if the user exists
     const user = await db.collection("users").findOne({ email });
     if (!user) {
-      return res.status(400).send({ message: "Invalid email or password." });
+      return res.status(400).json({
+        success: false,
+        message: "Login Failed. Please try again!",
+        source: "login",
+      });
     }
 
-    // Check if the password is correct
     const isPasswordValid = await bcryptjs.compare(password, user.password);
     if (!isPasswordValid) {
-      return res.status(400).send({ message: "Invalid email or password." });
+      return res.status(400).json({
+        success: false,
+        message: "Login Failed. Please try again!",
+        source: "login",
+      });
     }
 
-    // Generate token, set cookie, and get the token value
     const token = generateTokenAndSetCookie(res, user._id);
 
-    res.status(200).send({
-      message: "Successfully logged in!",
-      token, // Include the token in the response
-      user: {
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        contactNumber: user.contactNumber,
-        address: user.address,
-        bankAccountNumber: user.bankAccountNumber,
-        bankName: user.bankName,
-        shopName: user.shopName,
-        shopAddress: user.shopAddress,
-        shopRegistrationNumber: user.shopRegistrationNumber,
-        registrationNumber: user.registrationNumber,
-      },
+    // Construct user response without password
+    const userResponse = {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      contactNumber: user.contactNumber,
+      address: user.address,
+      shopName: user.shopName,
+      shopAddress: user.shopAddress,
+      shopRegistrationNumber: user.shopRegistrationNumber,
+      registrationNumber: user.registrationNumber,
+      logoUrl: user.logoUrl,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Logged in successfully!",
+      token,
+      user: userResponse,
+      source: "login",
     });
   } catch (error) {
-    res
-      .status(500)
-      .send({ message: "Error during login", error: error.message });
+    console.error("Login error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong during login. Please try again later.",
+      source: "login",
+      error: error.message,
+    });
   }
 };
 
 export const logout = async (req, res) => {
   try {
-    // Clear the authentication cookie
     res.clearCookie("token");
-    res.status(200).json({ message: "Successfully logged out!" });
+    res.status(200).json({
+      success: true,
+      message: "You have been logged out successfully!",
+      source: "logout",
+    });
   } catch (error) {
-    res
-      .status(500)
-      .send({ message: "Error during logout", error: error.message });
+    console.error("Logout error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong during logout. Please try again later.",
+      source: "logout",
+      error: error.message,
+    });
   }
 };
 
@@ -346,40 +366,49 @@ export const forgotPassword = async (req, res) => {
   const email = req.body.email.email;
   const db = mongoose.connection.db;
 
-  console.log("Received email:", email);
-
   try {
-    // Case-insensitive query
     const user = await db
       .collection("users")
       .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
 
     if (!user) {
-      console.log("User not found with email:", email);
-      return res.status(400).json({ message: "User not found." });
+      return res.status(400).json({
+        success: false,
+        message: "We couldn’t find an account with that email.",
+        source: "forgotPassword",
+      });
     }
 
-    // Generate password reset token
     const resetToken = crypto.randomBytes(20).toString("hex");
-    const resetTokenExpires = Date.now() + 3600000; // 1 hour
+    const resetTokenExpires = Date.now() + 3600000;
 
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = resetTokenExpires;
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          resetPasswordToken: resetToken,
+          resetPasswordExpires: resetTokenExpires,
+        },
+      }
+    );
 
-    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
-
-    // Send password reset email
     await sendPasswordResetEmail(
       user.email,
       `${process.env.CLIENT_URL}/reset-password/${resetToken}`
     );
-    console.log("Password reset email sent successfully.");
-    res
-      .status(200)
-      .json({ message: "Password reset email sent successfully." });
+    res.status(200).json({
+      success: true,
+      message: "A password reset link has been sent to your email.",
+      source: "forgotPassword",
+    });
   } catch (error) {
-    console.error("Error during password reset:", error.message);
-    res.status(500).json({ message: "Error during password reset." });
+    console.error("Password reset error:", error.message);
+    res.status(500).json({
+      success: false,
+      message:
+        "Something went wrong while sending the password reset email. Please try again later.",
+      source: "forgotPassword",
+    });
   }
 };
 
@@ -395,31 +424,59 @@ export const resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired token." });
+      return res.status(400).json({
+        success: false,
+        message: "The password reset link is invalid or has expired.",
+        source: "resetPassword",
+      });
     }
 
-    // Hash the new password
     const hashedPassword = await bcryptjs.hash(password, 12);
 
-    // Update user details
-    user.password = hashedPassword;
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
-
-    // Save changes
-    await db.collection("users").updateOne({ _id: user._id }, { $set: user });
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: { password: hashedPassword },
+        $unset: { resetPasswordToken: "", resetPasswordExpires: "" },
+      }
+    );
 
     sendResetPasswordConfirmationEmail(user.email);
 
-    res.status(200).json({ message: "Password reset successful." });
+    res.status(200).json({
+      success: true,
+      message: "Your password has been reset successfully!",
+      source: "resetPassword",
+    });
   } catch (error) {
-    console.error("Error during password reset:", error.message);
-    res.status(500).json({ message: "Error during password reset." });
+    console.error("Password reset error:", error.message);
+    res.status(500).json({
+      success: false,
+      message:
+        "Something went wrong while resetting your password. Please try again later.",
+      source: "resetPassword",
+    });
   }
 };
 
 export const checkAuth = async (req, res) => {
   try {
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Please log in to continue.",
+        source: "checkAuth",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(req.userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "There was an issue with your account. Please log in again.",
+        source: "checkAuth",
+      });
+    }
+
     const db = mongoose.connection.db;
     const user = await db
       .collection("users")
@@ -429,14 +486,17 @@ export const checkAuth = async (req, res) => {
       );
 
     if (!user) {
-      return res.status(401).send({ message: "User not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Your account could not be found. Please log in again.",
+        source: "checkAuth",
+      });
     }
 
-    // Generate a new token (if needed) or use the existing one
     const token = generateTokenAndSetCookie(res, user._id);
 
-    // Return only the required fields
     res.status(200).json({
+      success: true,
       user: {
         _id: user._id,
         email: user.email,
@@ -444,19 +504,29 @@ export const checkAuth = async (req, res) => {
         isVerified: user.isVerified,
         isApproved: user.isApproved,
       },
+      token,
+      source: "checkAuth",
     });
   } catch (error) {
-    console.log("Error checking authentication:", error.message);
-    res.status(500).send({ message: "Error checking authentication." });
+    console.error("Authentication check error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong on our end. Please try again later.",
+      source: "checkAuth",
+      error: error.message,
+    });
   }
 };
 
 export const checkIsApproved = async (req, res) => {
   const { userId } = req.params;
 
-  // Validate userId format if using MongoDB ObjectId
   if (!mongoose.Types.ObjectId.isValid(userId)) {
-    return res.status(400).json({ message: "Invalid user ID" });
+    return res.status(400).json({
+      success: false,
+      message: "There was an issue with your account ID.",
+      source: "checkIsApproved",
+    });
   }
 
   try {
@@ -469,63 +539,80 @@ export const checkIsApproved = async (req, res) => {
       );
 
     if (!user) {
-      return res.status(404).json({ message: "User not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Your account could not be found.",
+        source: "checkIsApproved",
+      });
     }
 
-    res.status(200).json({ isApproved: user.isApproved || false });
+    res.status(200).json({
+      success: true,
+      isApproved: user.isApproved || false,
+      source: "checkIsApproved",
+    });
   } catch (error) {
-    console.error("Error fetching isApproved value:", error.message);
-    res.status(500).json({ message: "Error fetching isApproved value." });
+    console.error("Approval check error:", error.message);
+    res.status(500).json({
+      success: false,
+      message:
+        "Something went wrong while checking your approval status. Please try again later.",
+      source: "checkIsApproved",
+    });
   }
 };
 
 export const deleteAccount = async (req, res) => {
   try {
-    const userId = req.userId; // Assuming this comes from your auth middleware
+    const userId = req.userId;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).send({ message: "Invalid user ID." });
+      return res.status(400).json({
+        success: false,
+        message: "There was an issue with your account ID.",
+        source: "deleteAccount",
+      });
     }
 
     const db = mongoose.connection.db;
-
-    // Find the user to be deleted
     const user = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(userId),
     });
 
     if (!user) {
-      return res.status(404).send({ message: "User not found." });
+      return res.status(404).json({
+        success: false,
+        message: "Your account could not be found.",
+        source: "deleteAccount",
+      });
     }
 
-    // Optional: Perform additional checks if needed
-    // For example, you might want to require password confirmation for deletion
-    const { password } = req.body;
-    if (password) {
-      const isPasswordValid = await bcryptjs.compare(password, user.password);
-      if (!isPasswordValid) {
-        return res.status(400).send({ message: "Invalid password." });
-      }
-    }
-
-    // Delete the user
     const result = await db.collection("users").deleteOne({
       _id: new mongoose.Types.ObjectId(userId),
     });
 
     if (result.deletedCount === 0) {
-      return res.status(400).send({ message: "Failed to delete account." });
+      return res.status(400).json({
+        success: false,
+        message: "We couldn’t delete your account. Please try again.",
+        source: "deleteAccount",
+      });
     }
 
-    // Clear authentication cookie
     res.clearCookie("token");
 
-    // Return success message
-    res.status(200).send({ message: "Account deleted successfully." });
+    res.status(200).json({
+      success: true,
+      message: "Your account has been deleted successfully.",
+      source: "deleteAccount",
+    });
   } catch (error) {
-    console.error("Delete account error:", error);
-    res.status(500).send({
-      message: "Error during account deletion",
+    console.error("Account deletion error:", error.message);
+    res.status(500).json({
+      success: false,
+      message:
+        "Something went wrong while deleting your account. Please try again later.",
+      source: "deleteAccount",
       error: error.message,
     });
   }
