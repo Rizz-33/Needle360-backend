@@ -34,6 +34,79 @@ const generateRegistrationNumber = async (db, role) => {
   return `${prefix}${nextNumber}`;
 };
 
+export const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide your email address.",
+        source: "resendVerificationEmail",
+      });
+    }
+
+    const db = mongoose.connection.db;
+    const user = await db.collection("users").findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No account found with this email address.",
+        source: "resendVerificationEmail",
+      });
+    }
+
+    if (user.isVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "This email address is already verified.",
+        source: "resendVerificationEmail",
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+    const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+
+    await db.collection("users").updateOne(
+      { _id: user._id },
+      {
+        $set: {
+          verificationToken,
+          verificationTokenExpires,
+        },
+      }
+    );
+
+    try {
+      await sendVerificationEmail(email, verificationToken);
+      return res.status(200).json({
+        success: true,
+        message: "Verification email resent successfully!",
+        source: "resendVerificationEmail",
+      });
+    } catch (emailError) {
+      console.error("Email sending error:", emailError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to resend verification email. Please try again later.",
+        source: "resendVerificationEmail",
+        error: emailError.message,
+      });
+    }
+  } catch (error) {
+    console.error("Resend verification error:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong. Please try again later.",
+      source: "resendVerificationEmail",
+    });
+  }
+};
+
 export const signup = async (req, res) => {
   try {
     const {
@@ -159,47 +232,63 @@ export const signup = async (req, res) => {
 
     try {
       await sendVerificationEmail(email, verificationToken);
+
+      generateTokenAndSetCookie(res, result.insertedId);
+
+      return res.status(201).json({
+        success: true,
+        message: "Account created successfully! Please verify your email.",
+        user: {
+          _id: result.insertedId,
+          email,
+          name,
+          role,
+          isApproved,
+          registrationNumber,
+          contactNumber: user.contactNumber,
+          address: user.address,
+          shopName: user.shopName,
+          shopAddress: user.shopAddress,
+          shopRegistrationNumber: user.shopRegistrationNumber,
+          logoUrl: user.logoUrl,
+        },
+        source: "signup",
+      });
     } catch (emailError) {
-      if (emailError.message.includes("has reached its limit")) {
-        console.warn(
-          "Email limit reached, continuing with signup without email verification"
-        );
-      } else {
-        await db.collection("users").deleteOne({ _id: result.insertedId });
-        throw new Error(
-          "We couldn’t send the verification email. Please try again later."
-        );
-      }
+      console.error("Email sending error:", emailError);
+
+      // Don't delete the user if email fails - allow them to request a new verification email later
+      return res.status(201).json({
+        success: true,
+        message:
+          "Account created but we couldn't send the verification email. Please request a new verification email later.",
+        user: {
+          _id: result.insertedId,
+          email,
+          name,
+          role,
+          isApproved,
+          registrationNumber,
+          contactNumber: user.contactNumber,
+          address: user.address,
+          shopName: user.shopName,
+          shopAddress: user.shopAddress,
+          shopRegistrationNumber: user.shopRegistrationNumber,
+          logoUrl: user.logoUrl,
+        },
+        source: "signup",
+        warning: "Verification email not sent",
+      });
     }
-
-    generateTokenAndSetCookie(res, result.insertedId);
-
-    res.status(201).json({
-      success: true,
-      message: "Account created successfully! Please verify your email.",
-      user: {
-        _id: result.insertedId,
-        email,
-        name,
-        role,
-        isApproved,
-        registrationNumber,
-        contactNumber: user.contactNumber,
-        address: user.address,
-        shopName: user.shopName,
-        shopAddress: user.shopAddress,
-        shopRegistrationNumber: user.shopRegistrationNumber,
-        logoUrl: user.logoUrl,
-      },
-      source: "signup",
-    });
   } catch (error) {
     console.error("Signup error:", error.message);
     res.status(500).json({
       success: false,
       message: "Something went wrong during signup. Please try again later.",
       source: "signup",
-      error: error.message,
+      error: error.message.includes("verification email")
+        ? "We couldn't send the verification email. Please try again later."
+        : error.message,
     });
   }
 };
