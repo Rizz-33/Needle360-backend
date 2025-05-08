@@ -10,7 +10,8 @@ export const sendVerificationEmail = async (email, verificationToken) => {
   const recipient = [{ email }];
 
   try {
-    const response = await mailtrapClient.send({
+    console.log("Preparing to send email to:", email);
+    const mailOptions = {
       from: sender,
       to: recipient,
       subject: "Please verify your email address",
@@ -19,14 +20,36 @@ export const sendVerificationEmail = async (email, verificationToken) => {
         verificationToken
       ),
       category: "Email Verification",
+    };
+
+    console.log("Mail options:", JSON.stringify(mailOptions, null, 2));
+    const response = await mailtrapClient.send(mailOptions);
+
+    console.log("Email sent successfully. Server response:", {
+      id: response.id,
+      status: response.status,
+      server_response: response.server_response,
     });
 
-    console.log(
-      `Verification email sent successfully to ${email}. Response ID: ${response.id}`
-    );
+    return response;
   } catch (error) {
-    console.error(`Failed to send verification email to ${email}:`, error);
-    throw new Error(`Failed to send verification email: ${error.message}`);
+    console.error("Complete email error details:", {
+      timestamp: new Date().toISOString(),
+      recipient: email,
+      error: {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        stack: error.stack,
+        response: error.response
+          ? {
+              status: error.response.status,
+              data: error.response.data,
+            }
+          : undefined,
+      },
+    });
+    throw error;
   }
 };
 
