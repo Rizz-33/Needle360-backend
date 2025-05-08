@@ -86,6 +86,7 @@ export const io = new Server(httpServer, {
 
 app.set("io", io);
 
+// Socket.IO event handling
 io.on("connection", (socket) => {
   console.log("New client connected:", socket.id);
 
@@ -184,6 +185,7 @@ connectToMongoDB()
       });
     });
 
+    // Start the server
     httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Backend server is running on port ${port}`);
     });
