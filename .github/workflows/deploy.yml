@@ -63,6 +63,9 @@ jobs:
             --name needle360-backend-container \
             -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' \
             -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
+            -e MAILTRAP_TOKEN='${{ secrets.MAILTRAP_TOKEN }}' \
+            -e MAILTRAP_SENDER_EMAIL='${{ secrets.MAILTRAP_SENDER_EMAIL }}' \
+            -e MAILTRAP_SENDER_NAME='${{ secrets.MAILTRAP_SENDER_NAME }}' \
             -e PORT=4000 \
             -e CLIENT_URL='https://needle360.online' \
             -e NODE_ENV=production \
