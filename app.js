@@ -184,6 +184,7 @@ connectToMongoDB()
       });
     });
 
+    // Start the server
     httpServer.listen(port, "0.0.0.0", () => {
       console.log(`Backend server is running on port ${port}`);
     });
