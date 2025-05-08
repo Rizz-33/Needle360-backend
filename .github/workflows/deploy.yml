@@ -56,11 +56,25 @@ jobs:
       - name: Remove Existing Container
         run: docker rm needle360-backend-container || true
 
+      - name: Create or Join Docker Network
+        run: docker network create needle360-network || true
+
+      - name: Start MongoDB Container
+        run: |
+          docker run -d \
+            --name mongo-container \
+            --restart unless-stopped \
+            --network needle360-network \
+            -v mongodb_data:/data/db \
+            mongo:latest || true
+
       - name: Run Docker Container
         run: |
           docker run -d \
             -p 4000:4000 \
             --name needle360-backend-container \
+            --network needle360-network \
+            -e MONGO_URI=mongodb://mongo-container:27017/needle360 \
             -e MONGODB_PASSWORD='${{ secrets.MONGODB_PASSWORD }}' \
             -e STRIPE_SECRET_KEY='${{ secrets.STRIPE_SECRET_KEY }}' \
             -e MAILTRAP_TOKEN='${{ secrets.MAILTRAP_TOKEN }}' \
@@ -74,4 +88,22 @@ jobs:
             rizz336/needle360-backend:latest
 
       - name: Verify Container Running
-        run: docker ps | grep needle360-backend-container
+        run: |
+          sleep 10
+          docker ps -a
+          docker logs needle360-backend-container
+
+      - name: Wait for backend to be ready
+        run: |
+          echo "Waiting for backend to be ready..."
+          for i in {1..10}; do
+            if curl -s -f http://localhost:4000/health >/dev/null; then
+              echo "Backend is ready"
+              exit 0
+            fi
+            echo "Attempt $i: Backend not ready yet"
+            sleep 5
+          done
+          echo "Backend did not become ready after 10 attempts"
+          docker logs needle360-backend-container
+          exit 1
