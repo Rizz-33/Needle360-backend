@@ -67,6 +67,25 @@ const validateDesignData = (design) => {
     }
   }
 
+  // Validate imageURLs if provided
+  if (design.imageURLs) {
+    if (!Array.isArray(design.imageURLs) || design.imageURLs.length === 0) {
+      return {
+        isValid: false,
+        message: "imageURLs must be a non-empty array.",
+      };
+    }
+    const invalidURLs = design.imageURLs.filter(
+      (url) => typeof url !== "string" || !url.trim()
+    );
+    if (invalidURLs.length > 0) {
+      return {
+        isValid: false,
+        message: "All imageURLs must be valid non-empty strings.",
+      };
+    }
+  }
+
   return { isValid: true };
 };
 
@@ -88,6 +107,7 @@ export const getAllDesigns = async (req, res) => {
         ...design,
         userId: user._id.toString(),
         userType: user.role === ROLES.TAILOR_SHOP_OWNER ? "tailor" : "customer",
+        imageUrl: design.imageURLs?.[0] || design.imageUrl || null, // Backward compatibility
       }))
     );
 
@@ -118,6 +138,7 @@ export const getAllTailorDesigns = async (req, res) => {
       (tailor.designs || []).map((design) => ({
         ...design,
         tailorId: tailor._id.toString(),
+        imageUrl: design.imageURLs?.[0] || design.imageUrl || null, // Backward compatibility
       }))
     );
 
@@ -145,6 +166,7 @@ export const getAllCustomerDesigns = async (req, res) => {
       (customer.designs || []).map((design) => ({
         ...design,
         customerId: customer._id.toString(),
+        imageUrl: design.imageURLs?.[0] || design.imageUrl || null, // Backward compatibility
       }))
     );
 
@@ -184,7 +206,7 @@ export const getTailorDesignsById = async (req, res) => {
     const designs = (tailor.designs || []).map((design) => ({
       ...design,
       tailorId: id,
-      imageUrl: design.imageUrl || design.imageURLs?.[0] || null,
+      imageUrl: design.imageURLs?.[0] || design.imageUrl || null, // Backward compatibility
     }));
 
     res.json(designs);
@@ -223,7 +245,7 @@ export const getCustomerDesignsById = async (req, res) => {
     const designs = (customer.designs || []).map((design) => ({
       ...design,
       customerId: id,
-      imageUrl: design.imageUrl || design.imageURLs?.[0] || null,
+      imageUrl: design.imageURLs?.[0] || design.imageUrl || null, // Backward compatibility
     }));
 
     res.json(designs);
@@ -259,17 +281,13 @@ export const createTailorDesign = async (req, res) => {
       tailorId: id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      imageUrl: design.imageURLs?.[0] || null,
+      imageURLs: design.imageURLs || [], // Store array of image URLs
       tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
-    // Remove any id field if it exists to avoid duplication
+    // Remove any id or imageUrl field if it exists to avoid duplication
     delete newDesign.id;
-
-    // Handle image URLs consistency
-    if (newDesign.imageURLs) {
-      delete newDesign.imageURLs;
-    }
+    delete newDesign.imageUrl;
 
     const db = mongoose.connection.db;
     const tailor = await db
@@ -284,7 +302,11 @@ export const createTailorDesign = async (req, res) => {
       return res.status(404).json({ message: "Tailor not found" });
     }
 
-    res.status(201).json({ design: newDesign });
+    res
+      .status(201)
+      .json({
+        design: { ...newDesign, imageUrl: newDesign.imageURLs[0] || null },
+      });
   } catch (error) {
     console.error("Error creating tailor design:", error);
     res.status(500).json({
@@ -317,17 +339,13 @@ export const createCustomerDesign = async (req, res) => {
       customerId: id,
       createdAt: new Date(),
       updatedAt: new Date(),
-      imageUrl: design.imageURLs?.[0] || null,
+      imageURLs: design.imageURLs || [], // Store array of image URLs
       tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
-    // Remove any id field if it exists to avoid duplication
+    // Remove any id or imageUrl field if it exists to avoid duplication
     delete newDesign.id;
-
-    // Handle image URLs consistency
-    if (newDesign.imageURLs) {
-      delete newDesign.imageURLs;
-    }
+    delete newDesign.imageUrl;
 
     const db = mongoose.connection.db;
     const customer = await db
@@ -342,7 +360,11 @@ export const createCustomerDesign = async (req, res) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    res.status(201).json({ design: newDesign });
+    res
+      .status(201)
+      .json({
+        design: { ...newDesign, imageUrl: newDesign.imageURLs[0] || null },
+      });
   } catch (error) {
     console.error("Error creating customer design:", error);
     res.status(500).json({
@@ -371,17 +393,13 @@ export const updateTailorDesign = async (req, res) => {
     const updateData = {
       ...design,
       updatedAt: new Date(),
+      imageURLs: design.imageURLs || [], // Update with array of image URLs
       tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
-    // Handle image URL update
-    if (design.imageURLs) {
-      updateData.imageUrl = design.imageURLs[0] || null;
-      delete updateData.imageURLs;
-    }
-
-    // Remove any id field if it exists to avoid duplication
+    // Remove any id or imageUrl field if it exists to avoid duplication
     delete updateData.id;
+    delete updateData.imageUrl;
 
     const db = mongoose.connection.db;
     const result = await db.collection("users").findOneAndUpdate(
@@ -416,7 +434,12 @@ export const updateTailorDesign = async (req, res) => {
       return res.status(404).json({ message: "Design not found after update" });
     }
 
-    res.json({ design: updatedDesign });
+    res.json({
+      design: {
+        ...updatedDesign,
+        imageUrl: updatedDesign.imageURLs[0] || null,
+      },
+    });
   } catch (error) {
     console.error("Error updating tailor design:", error);
     res.status(500).json({
@@ -445,17 +468,13 @@ export const updateCustomerDesign = async (req, res) => {
     const updateData = {
       ...design,
       updatedAt: new Date(),
+      imageURLs: design.imageURLs || [], // Update with array of image URLs
       tags: design.tags || [], // Include tags if provided, default to empty array
     };
 
-    // Handle image URL update
-    if (design.imageURLs) {
-      updateData.imageUrl = design.imageURLs[0] || null;
-      delete updateData.imageURLs;
-    }
-
-    // Remove any id field if it exists to avoid duplication
+    // Remove any id or imageUrl field if it exists to avoid duplication
     delete updateData.id;
+    delete updateData.imageUrl;
 
     const db = mongoose.connection.db;
     const result = await db.collection("users").findOneAndUpdate(
@@ -490,7 +509,12 @@ export const updateCustomerDesign = async (req, res) => {
       return res.status(404).json({ message: "Design not found after update" });
     }
 
-    res.json({ design: updatedDesign });
+    res.json({
+      design: {
+        ...updatedDesign,
+        imageUrl: updatedDesign.imageURLs[0] || null,
+      },
+    });
   } catch (error) {
     console.error("Error updating customer design:", error);
     res.status(500).json({
