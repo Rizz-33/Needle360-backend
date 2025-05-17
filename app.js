@@ -2,12 +2,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import session from "express-session";
 import http from "http";
 import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
-
-// Routes imported from their respective files
 import webhookRoutes from "./mailtrap/webhookController.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
@@ -23,6 +22,7 @@ import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
+import passport from "./utils/passport.config.js";
 
 dotenv.config();
 
@@ -33,6 +33,9 @@ const requiredEnvVars = [
   "MONGODB_PASSWORD",
   "STRIPE_SECRET_KEY",
   "JWT_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "SESSION_SECRET",
 ];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
@@ -45,14 +48,12 @@ if (missingEnvVars.length > 0) {
 const app = express();
 const httpServer = http.createServer(app);
 
-// Define allowed origins for CORS and Socket.IO
+// CORS configuration
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:5173",
   "http://172.20.10.5",
   "http://13.61.16.74",
-  "http://13.61.16.74",
-  "http://needle360.online",
   "https://needle360.online",
   "http://www.needle360.online",
   "https://www.needle360.online",
@@ -60,6 +61,47 @@ const allowedOrigins = [
   /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/,
   /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
 ].filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (
+        !origin ||
+        allowedOrigins.some((allowed) =>
+          typeof allowed === "string"
+            ? allowed === origin
+            : allowed.test(origin)
+        )
+      ) {
+        callback(null, true);
+      } else {
+        console.warn(`Blocked CORS request from origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+// Session middleware
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Socket.IO initialization
 export const io = new Server(httpServer, {
@@ -113,33 +155,6 @@ io.on("connection", (socket) => {
 
 const port = process.env.PORT || 4000;
 
-// CORS configuration for HTTP requests
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.some((allowed) =>
-          typeof allowed === "string"
-            ? allowed === origin
-            : allowed.test(origin)
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.warn(`Blocked CORS request from origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
-
-// Preflight request handling
-app.options("*", cors());
-
 // Parse JSON bodies
 app.use(express.json({ limit: "16mb" }));
 
@@ -176,7 +191,6 @@ connectToMongoDB()
       res.json({ message: "API server is up and running" });
     });
 
-    // Add this before httpServer.listen()
     app.get("/", (req, res) => {
       res.json({
         message: "Welcome to Needle360 Backend",

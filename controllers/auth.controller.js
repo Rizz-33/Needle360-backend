@@ -11,7 +11,7 @@ import {
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
 // Function to generate a unique registration number based on user role
-const generateRegistrationNumber = async (db, role) => {
+export const generateRegistrationNumber = async (db, role) => {
   let prefix = "A"; // Default prefix for admin
   if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
   else if (role === ROLES.USER) prefix = "C"; // Customer

@@ -10,7 +10,10 @@ const baseUserSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
     },
     name: {
       type: String,
