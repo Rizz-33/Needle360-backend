@@ -84,6 +84,9 @@ jobs:
             -e CLIENT_URL='https://needle360.online' \
             -e NODE_ENV=production \
             -e JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+            -e GOOGLE_CLIENT_ID='${{ secrets.GOOGLE_CLIENT_ID }}' \
+            -e GOOGLE_CLIENT_SECRET='${{ secrets.GOOGLE_CLIENT_SECRET }}' \
+            -e SESSION_SECRET='${{ secrets.SESSION_SECRET }}' \
             --restart unless-stopped \
             rizz336/needle360-backend:latest
 
