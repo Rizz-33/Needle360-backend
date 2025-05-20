@@ -23,7 +23,7 @@ const EMAIL_SIGNATURE = `
           <p style="margin: 5px 0 0; font-size: 13px; color: #666;">Your All-in-One Business Solution</p>
           <p style="margin: 5px 0 0; font-size: 12px; color: #666;">
             <a href="https://www.needle360.com" style="color: ${COLORS.primary}; text-decoration: none;">www.needle360.com</a> | 
-            <a href="mailto:support@needle360.com" style="color: ${COLORS.primary}; text-decoration: none;">support@needle360.com</a>
+            <a href="mailto:needle360.online@gmail.com" style="color: ${COLORS.primary}; text-decoration: none;">support@needle360.com</a>
           </p>
         </td>
       </tr>
@@ -115,7 +115,7 @@ export const WELCOME_EMAIL_TEMPLATE = `
                     COLORS.primary
                   }; color: white; padding: 12px 25px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Access Your Dashboard</a>
               </div>
-              <p>Our customer success team is available to assist you with any questions you may have. Feel free to reach out at <a href="mailto:support@needle360.com" style="color: ${
+              <p>Our customer success team is available to assist you with any questions you may have. Feel free to reach out at <a href="mailto:needle360.online@gmail.com" style="color: ${
                 COLORS.primary
               }; text-decoration: none;">support@needle360.com</a>.</p>
               <p>Best regards,<br>The needle360° Team</p>
