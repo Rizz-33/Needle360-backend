@@ -6,6 +6,7 @@ import {
   forgotPassword,
   login,
   logout,
+  resendVerificationEmail,
   resetPassword,
   signup,
   verifyEmail,
@@ -31,10 +32,32 @@ router.get(
     failureRedirect: `${process.env.CLIENT_URL}/login?error=auth_failed`,
     session: false,
   }),
-  (req, res) => {
+  async (req, res) => {
     try {
       const user = req.user;
       const token = generateTokenAndSetCookie(res, user._id);
+
+      // Generate verification token if user is not verified
+      if (!user.isVerified) {
+        const verificationToken = Math.floor(
+          100000 + Math.random() * 900000
+        ).toString();
+        const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+
+        const db = mongoose.connection.db;
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              verificationToken,
+              verificationTokenExpires,
+            },
+          }
+        );
+
+        // Send verification email
+        await sendVerificationEmail(user.email, verificationToken);
+      }
 
       const userResponse = {
         _id: user._id,
@@ -78,6 +101,7 @@ router.post("/signup", signup);
 router.post("/login", login);
 router.post("/logout", logout);
 router.post("/verify-email", verifyEmail);
+router.post("/resend-verification", resendVerificationEmail);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password/:token", resetPassword);
 router.delete("/delete-account", verifyToken, deleteAccount);
