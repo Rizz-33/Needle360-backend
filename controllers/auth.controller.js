@@ -10,11 +10,10 @@ import {
 } from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
-// Function to generate a unique registration number based on user role
 export const generateRegistrationNumber = async (db, role) => {
-  let prefix = "A"; // Default prefix for admin
+  let prefix = "A";
   if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
-  else if (role === ROLES.USER) prefix = "C"; // Customer
+  else if (role === ROLES.USER) prefix = "C";
 
   const highestRegUser = await db
     .collection("users")
@@ -65,11 +64,10 @@ export const resendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Generate new verification token
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+    const verificationTokenExpires = Date.now() + 3600000;
 
     await db.collection("users").updateOne(
       { _id: user._id },
@@ -336,7 +334,6 @@ export const verifyEmail = async (req, res) => {
       console.warn("Failed to send welcome email:", emailError.message);
     }
 
-    // Construct user response without password
     const userResponse = {
       _id: user._id,
       email: user.email,
@@ -404,7 +401,6 @@ export const login = async (req, res) => {
 
     const token = generateTokenAndSetCookie(res, user._id);
 
-    // Construct user response without password
     const userResponse = {
       _id: user._id,
       email: user.email,

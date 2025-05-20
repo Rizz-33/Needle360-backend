@@ -48,7 +48,6 @@ router.get(
     try {
       const user = req.user;
 
-      // If this is a new user, update their role if it was specified during the initial request
       if (req.session && req.session.userRole) {
         const db = mongoose.connection.db;
         await db.collection("users").updateOne(
@@ -58,21 +57,17 @@ router.get(
           }
         );
 
-        // Update the user object with the new role
         user.role = req.session.userRole;
-
-        // Clear session after use
         delete req.session.userRole;
       }
 
       const token = generateTokenAndSetCookie(res, user._id);
 
-      // If user is not verified, send verification email
       if (!user.isVerified) {
         const verificationToken = Math.floor(
           100000 + Math.random() * 900000
         ).toString();
-        const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+        const verificationTokenExpires = Date.now() + 3600000;
 
         const db = mongoose.connection.db;
         await db.collection("users").updateOne(

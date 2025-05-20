@@ -4,7 +4,6 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import ROLES from "../constants.js";
 import { generateRegistrationNumber } from "../controllers/auth.controller.js";
 
-// Configure Google OAuth Strategy
 passport.use(
   new GoogleStrategy(
     {
@@ -26,7 +25,6 @@ passport.use(
           return done(null, existingUser);
         }
 
-        // Only allow role: 1 (USER) for Google OAuth
         const role = req.session?.userRole || ROLES.USER;
         if (role !== ROLES.USER) {
           return done(
@@ -35,7 +33,6 @@ passport.use(
           );
         }
 
-        // Create new user
         const registrationNumber = await generateRegistrationNumber(db, role);
 
         const newUser = {
@@ -69,12 +66,10 @@ passport.use(
   )
 );
 
-// Serialize user for session
 passport.serializeUser((user, done) => {
   done(null, user._id);
 });
 
-// Deserialize user from session
 passport.deserializeUser(async (id, done) => {
   try {
     const db = mongoose.connection.db;
@@ -87,5 +82,4 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// Export the configured passport instance
 export default passport;
