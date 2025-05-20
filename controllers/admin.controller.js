@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
+import { sendWelcomeEmail } from "../mailtrap/emails.js";
 
 export const approveTailorById = async (req, res) => {
   try {
@@ -21,6 +22,29 @@ export const approveTailorById = async (req, res) => {
     if (!tailor) {
       return res.status(404).json({
         message: "Unapproved tailor not found or already approved",
+      });
+    }
+
+    if (result.modifiedCount > 0) {
+      try {
+        await sendWelcomeEmail(updatedTailor.email, updatedTailor.name);
+      } catch (emailError) {
+        console.error(
+          "Failed to send welcome email to approved tailor:",
+          emailError
+        );
+      }
+
+      const {
+        password,
+        resetPasswordToken,
+        resetPasswordExpires,
+        ...tailorDetails
+      } = updatedTailor;
+
+      res.status(200).json({
+        message: "Tailor approved successfully",
+        tailor: tailorDetails,
       });
     }
 

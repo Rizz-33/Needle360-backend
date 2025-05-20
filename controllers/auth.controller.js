@@ -5,6 +5,7 @@ import ROLES from "../constants.js";
 import {
   sendPasswordResetEmail,
   sendResetPasswordConfirmationEmail,
+  sendTailorApprovalNotification,
   sendVerificationEmail,
   sendWelcomeEmail,
 } from "../mailtrap/emails.js";
@@ -229,6 +230,23 @@ export const signup = async (req, res) => {
     }
 
     const token = generateTokenAndSetCookie(res, result.insertedId);
+
+    if (
+      result.acknowledged &&
+      result.insertedId &&
+      role === ROLES.TAILOR_SHOP_OWNER
+    ) {
+      try {
+        const approvalLink = `${process.env.ADMIN_URL}/admin/tailors/${result.insertedId}/approve`;
+        await sendTailorApprovalNotification(user, approvalLink);
+      } catch (emailError) {
+        console.error(
+          "Failed to send tailor approval notification:",
+          emailError
+        );
+        // Don't fail the signup process if the notification fails
+      }
+    }
 
     try {
       await sendVerificationEmail(email, verificationToken);
@@ -570,27 +588,25 @@ export const checkAuth = async (req, res) => {
     }
 
     const db = mongoose.connection.db;
-    const user = await db
-      .collection("users")
-      .findOne(
-        { _id: new mongoose.Types.ObjectId(req.userId) },
-        {
-          projection: {
-            email: 1,
-            role: 1,
-            isVerified: 1,
-            isApproved: 1,
-            registrationNumber: 1,
-            name: 1,
-            contactNumber: 1,
-            address: 1,
-            shopName: 1,
-            shopAddress: 1,
-            shopRegistrationNumber: 1,
-            logoUrl: 1,
-          },
-        }
-      );
+    const user = await db.collection("users").findOne(
+      { _id: new mongoose.Types.ObjectId(req.userId) },
+      {
+        projection: {
+          email: 1,
+          role: 1,
+          isVerified: 1,
+          isApproved: 1,
+          registrationNumber: 1,
+          name: 1,
+          contactNumber: 1,
+          address: 1,
+          shopName: 1,
+          shopAddress: 1,
+          shopRegistrationNumber: 1,
+          logoUrl: 1,
+        },
+      }
+    );
 
     if (!user) {
       return res.status(404).json({
