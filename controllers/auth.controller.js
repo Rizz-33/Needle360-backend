@@ -379,11 +379,36 @@ export const login = async (req, res) => {
 
   try {
     const db = mongoose.connection.db;
-    const user = await db.collection("users").findOne({ email });
+
+    // Case-insensitive email search and ensure we get the password field
+    const user = await db.collection("users").findOne(
+      { email: { $regex: new RegExp(`^${email}$`, "i") } },
+      {
+        projection: {
+          password: 1,
+          email: 1,
+          name: 1,
+          role: 1,
+          isVerified: 1,
+          _id: 1,
+        },
+      }
+    );
+
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Login Failed. Please try again!",
+        message: "Invalid email or password.",
+        source: "login",
+      });
+    }
+
+    // Verify password exists and is a string
+    if (!user.password || typeof user.password !== "string") {
+      console.error("Invalid password format for user:", user._id);
+      return res.status(500).json({
+        success: false,
+        message: "Authentication error. Please try again later.",
         source: "login",
       });
     }
@@ -392,33 +417,29 @@ export const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: "Login Failed. Please try again!",
+        message: "Invalid email or password.",
         source: "login",
       });
     }
 
+    // Generate token and get user data without sensitive fields
     const token = generateTokenAndSetCookie(res, user._id);
-
-    // Construct user response without password
-    const userResponse = {
-      _id: user._id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      contactNumber: user.contactNumber,
-      address: user.address,
-      shopName: user.shopName,
-      shopAddress: user.shopAddress,
-      shopRegistrationNumber: user.shopRegistrationNumber,
-      registrationNumber: user.registrationNumber,
-      logoUrl: user.logoUrl,
-    };
+    const userData = await db.collection("users").findOne(
+      { _id: user._id },
+      {
+        projection: {
+          password: 0,
+          resetPasswordToken: 0,
+          verificationToken: 0,
+        },
+      }
+    );
 
     res.status(200).json({
       success: true,
       message: "Logged in successfully!",
       token,
-      user: userResponse,
+      user: userData,
       source: "login",
     });
   } catch (error) {
