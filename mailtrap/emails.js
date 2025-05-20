@@ -1,6 +1,7 @@
 import {
   PASSWORD_RESET_REQUEST_TEMPLATE,
   PASSWORD_RESET_SUCCESS_TEMPLATE,
+  TAILOR_APPROVAL_NOTIFICATION_TEMPLATE,
   VERIFICATION_EMAIL_TEMPLATE,
   WELCOME_EMAIL_TEMPLATE,
 } from "./emailTemplates.js";
@@ -72,9 +73,9 @@ export const sendWelcomeEmail = async (email, name) => {
     console.log(
       `Welcome email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(`Failed to send welcome email to ${email}: ${error.message}`);
-
     throw new Error(`Failed to send welcome email: ${error.message}`);
   }
 };
@@ -98,11 +99,11 @@ export const sendPasswordResetEmail = async (email, resetURL) => {
     console.log(
       `Password reset email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(
       `Failed to send password reset email to ${email}: ${error.message}`
     );
-
     throw new Error(`Failed to send password reset email: ${error.message}`);
   }
 };
@@ -126,13 +127,52 @@ export const sendResetPasswordConfirmationEmail = async (email) => {
     console.log(
       `Password reset confirmation email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(
       `Failed to send password reset confirmation email to ${email}: ${error.message}`
     );
-
     throw new Error(
       `Failed to send password reset confirmation email: ${error.message}`
     );
+  }
+};
+
+export const sendTailorApprovalNotification = async (
+  tailorDetails,
+  approvalLink
+) => {
+  const recipient = [{ email: "needle360.online@gmail.com" }];
+
+  try {
+    const mailOptions = {
+      from: sender,
+      to: recipient,
+      subject: "New Tailor Registration - Approval Required",
+      html: TAILOR_APPROVAL_NOTIFICATION_TEMPLATE.replace(
+        "{name}",
+        tailorDetails.name
+      )
+        .replace("{email}", tailorDetails.email)
+        .replace(
+          "{contactNumber}",
+          tailorDetails.contactNumber || "Not provided"
+        )
+        .replace("{shopName}", tailorDetails.shopName || "Not provided")
+        .replace("{shopAddress}", tailorDetails.shopAddress || "Not provided")
+        .replace("{registrationNumber}", tailorDetails.registrationNumber)
+        .replace("{approvalLink}", approvalLink),
+      category: "Tailor Approval",
+    };
+
+    const response = await mailtrapClient.send(mailOptions);
+    console.log(
+      "Tailor approval notification sent successfully. Response ID:",
+      response.id
+    );
+    return response;
+  } catch (error) {
+    console.error("Error sending tailor approval notification:", error);
+    throw error;
   }
 };

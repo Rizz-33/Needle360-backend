@@ -5,16 +5,16 @@ import ROLES from "../constants.js";
 import {
   sendPasswordResetEmail,
   sendResetPasswordConfirmationEmail,
+  sendTailorApprovalNotification,
   sendVerificationEmail,
   sendWelcomeEmail,
 } from "../mailtrap/emails.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
 
-// Function to generate a unique registration number based on user role
 export const generateRegistrationNumber = async (db, role) => {
-  let prefix = "A"; // Default prefix for admin
+  let prefix = "A";
   if (role === ROLES.TAILOR_SHOP_OWNER) prefix = "T";
-  else if (role === ROLES.USER) prefix = "C"; // Customer
+  else if (role === ROLES.USER) prefix = "C";
 
   const highestRegUser = await db
     .collection("users")
@@ -65,11 +65,10 @@ export const resendVerificationEmail = async (req, res) => {
       });
     }
 
-    // Generate new verification token
     const verificationToken = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
-    const verificationTokenExpires = Date.now() + 3600000; // 1 hour
+    const verificationTokenExpires = Date.now() + 3600000;
 
     await db.collection("users").updateOne(
       { _id: user._id },
@@ -230,14 +229,29 @@ export const signup = async (req, res) => {
       throw new Error("Failed to create account in database");
     }
 
+    const token = generateTokenAndSetCookie(res, result.insertedId);
+
+    // Send tailor approval notification if user is a tailor
+    if (role === ROLES.TAILOR_SHOP_OWNER) {
+      try {
+        const approvalLink = `${process.env.API_URL}/admin/tailors/${result.insertedId}/approve`;
+        await sendTailorApprovalNotification(user, approvalLink);
+      } catch (emailError) {
+        console.error(
+          "Failed to send tailor approval notification:",
+          emailError
+        );
+        // Don't fail the signup process if the notification fails
+      }
+    }
+
     try {
       await sendVerificationEmail(email, verificationToken);
-
-      generateTokenAndSetCookie(res, result.insertedId);
 
       return res.status(201).json({
         success: true,
         message: "Account created successfully! Please verify your email.",
+        token,
         user: {
           _id: result.insertedId,
           email,
@@ -257,11 +271,11 @@ export const signup = async (req, res) => {
     } catch (emailError) {
       console.error("Email sending error:", emailError);
 
-      // Don't delete the user if email fails - allow them to request a new verification email later
       return res.status(201).json({
         success: true,
         message:
           "Account created but we couldn't send the verification email. Please request a new verification email later.",
+        token,
         user: {
           _id: result.insertedId,
           email,
@@ -327,19 +341,21 @@ export const verifyEmail = async (req, res) => {
       }
     );
 
+    const token = generateTokenAndSetCookie(res, user._id);
+
     try {
       await sendWelcomeEmail(user.email, user.name);
     } catch (emailError) {
       console.warn("Failed to send welcome email:", emailError.message);
     }
 
-    // Construct user response without password
     const userResponse = {
       _id: user._id,
       email: user.email,
       name: user.name,
       role: user.role,
       isVerified: true,
+      isApproved: user.isApproved,
       registrationNumber: user.registrationNumber,
       contactNumber: user.contactNumber,
       address: user.address,
@@ -352,6 +368,7 @@ export const verifyEmail = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Email verified successfully! Welcome aboard!",
+      token,
       user: userResponse,
       source: "verifyEmail",
     });
@@ -379,36 +396,11 @@ export const login = async (req, res) => {
 
   try {
     const db = mongoose.connection.db;
-
-    // Case-insensitive email search and ensure we get the password field
-    const user = await db.collection("users").findOne(
-      { email: { $regex: new RegExp(`^${email}$`, "i") } },
-      {
-        projection: {
-          password: 1,
-          email: 1,
-          name: 1,
-          role: 1,
-          isVerified: 1,
-          _id: 1,
-        },
-      }
-    );
-
+    const user = await db.collection("users").findOne({ email });
     if (!user) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email or password.",
-        source: "login",
-      });
-    }
-
-    // Verify password exists and is a string
-    if (!user.password || typeof user.password !== "string") {
-      console.error("Invalid password format for user:", user._id);
-      return res.status(500).json({
-        success: false,
-        message: "Authentication error. Please try again later.",
+        message: "Login Failed. Please try again!",
         source: "login",
       });
     }
@@ -417,29 +409,34 @@ export const login = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(400).json({
         success: false,
-        message: "Invalid email or password.",
+        message: "Login Failed. Please try again!",
         source: "login",
       });
     }
 
-    // Generate token and get user data without sensitive fields
     const token = generateTokenAndSetCookie(res, user._id);
-    const userData = await db.collection("users").findOne(
-      { _id: user._id },
-      {
-        projection: {
-          password: 0,
-          resetPasswordToken: 0,
-          verificationToken: 0,
-        },
-      }
-    );
+
+    const userResponse = {
+      _id: user._id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      isVerified: user.isVerified,
+      isApproved: user.isApproved,
+      registrationNumber: user.registrationNumber,
+      contactNumber: user.contactNumber,
+      address: user.address,
+      shopName: user.shopName,
+      shopAddress: user.shopAddress,
+      shopRegistrationNumber: user.shopRegistrationNumber,
+      logoUrl: user.logoUrl,
+    };
 
     res.status(200).json({
       success: true,
       message: "Logged in successfully!",
       token,
-      user: userData,
+      user: userResponse,
       source: "login",
     });
   } catch (error) {
@@ -588,12 +585,25 @@ export const checkAuth = async (req, res) => {
     }
 
     const db = mongoose.connection.db;
-    const user = await db
-      .collection("users")
-      .findOne(
-        { _id: new mongoose.Types.ObjectId(req.userId) },
-        { projection: { email: 1, role: 1, isVerified: 1, isApproved: 1 } }
-      );
+    const user = await db.collection("users").findOne(
+      { _id: new mongoose.Types.ObjectId(req.userId) },
+      {
+        projection: {
+          email: 1,
+          role: 1,
+          isVerified: 1,
+          isApproved: 1,
+          registrationNumber: 1,
+          name: 1,
+          contactNumber: 1,
+          address: 1,
+          shopName: 1,
+          shopAddress: 1,
+          shopRegistrationNumber: 1,
+          logoUrl: 1,
+        },
+      }
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -610,9 +620,17 @@ export const checkAuth = async (req, res) => {
       user: {
         _id: user._id,
         email: user.email,
+        name: user.name,
         role: user.role,
         isVerified: user.isVerified,
         isApproved: user.isApproved,
+        registrationNumber: user.registrationNumber,
+        contactNumber: user.contactNumber,
+        address: user.address,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopRegistrationNumber: user.shopRegistrationNumber,
+        logoUrl: user.logoUrl,
       },
       token,
       source: "checkAuth",

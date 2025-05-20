@@ -23,13 +23,13 @@ const EMAIL_SIGNATURE = `
           <p style="margin: 5px 0 0; font-size: 13px; color: #666;">Your All-in-One Business Solution</p>
           <p style="margin: 5px 0 0; font-size: 12px; color: #666;">
             <a href="https://www.needle360.com" style="color: ${COLORS.primary}; text-decoration: none;">www.needle360.com</a> | 
-            <a href="mailto:support@needle360.com" style="color: ${COLORS.primary}; text-decoration: none;">support@needle360.com</a>
+            <a href="mailto:needle360.online@gmail.com" style="color: ${COLORS.primary}; text-decoration: none;">support@needle360.com</a>
           </p>
         </td>
       </tr>
     </table>
   </div>
-  `;
+`;
 
 export const VERIFICATION_EMAIL_TEMPLATE = `
   <!DOCTYPE html>
@@ -76,7 +76,7 @@ export const VERIFICATION_EMAIL_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const WELCOME_EMAIL_TEMPLATE = `
   <!DOCTYPE html>
@@ -115,7 +115,7 @@ export const WELCOME_EMAIL_TEMPLATE = `
                     COLORS.primary
                   }; color: white; padding: 12px 25px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Access Your Dashboard</a>
               </div>
-              <p>Our customer success team is available to assist you with any questions you may have. Feel free to reach out at <a href="mailto:support@needle360.com" style="color: ${
+              <p>Our customer success team is available to assist you with any questions you may have. Feel free to reach out at <a href="mailto:needle360.online@gmail.com" style="color: ${
                 COLORS.primary
               }; text-decoration: none;">support@needle360.com</a>.</p>
               <p>Best regards,<br>The needle360° Team</p>
@@ -128,7 +128,7 @@ export const WELCOME_EMAIL_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const PASSWORD_RESET_SUCCESS_TEMPLATE = `
   <!DOCTYPE html>
@@ -182,7 +182,7 @@ export const PASSWORD_RESET_SUCCESS_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const PASSWORD_RESET_REQUEST_TEMPLATE = `
   <!DOCTYPE html>
@@ -228,4 +228,64 @@ export const PASSWORD_RESET_REQUEST_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
+
+export const TAILOR_APPROVAL_NOTIFICATION_TEMPLATE = `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>New Tailor Registration | needle360°</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f7f7f7;">
+      <div style="background-color: ${
+        COLORS.background
+      }; border-radius: 5px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="background: linear-gradient(to right, ${
+            COLORS.primary
+          }, ${
+  COLORS.accent
+}); padding: 25px; text-align: center; border-radius: 5px 5px 0 0;">
+              <img src="${LOGO_URL}" alt="needle360°" style="width: 120px; height: auto; margin-bottom: 10px;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">New Tailor Registration</h1>
+          </div>
+          <div style="background-color: ${
+            COLORS.background
+          }; padding: 30px; border-radius: 0 0 5px 5px;">
+              <p style="margin-top: 0;">Hello Admin,</p>
+              <p>A new tailor with role type 4 has registered on the system. Here are the details:</p>
+              
+              <div style="background-color: ${
+                COLORS.secondary
+              }; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                  <h3 style="margin-top: 0; color: ${
+                    COLORS.accent
+                  };">Tailor Details</h3>
+                  <p style="margin: 5px 0;"><strong>Name:</strong> {name}</p>
+                  <p style="margin: 5px 0;"><strong>Email:</strong> {email}</p>
+                  <p style="margin: 5px 0;"><strong>Contact Number:</strong> {contactNumber}</p>
+                  <p style="margin: 5px 0;"><strong>Shop Name:</strong> {shopName}</p>
+                  <p style="margin: 5px 0;"><strong>Shop Address:</strong> {shopAddress}</p>
+                  <p style="margin: 5px 0;"><strong>Registration Number:</strong> {registrationNumber}</p>
+              </div>
+              
+              <p>Please review this registration and approve the tailor if everything looks correct.</p>
+              
+              <div style="text-align: center; margin: 30px 0;">
+                  <a href="{approvalLink}" style="background-color: ${
+                    COLORS.primary
+                  }; color: white; padding: 12px 25px; text-decoration: none; border-radius: 12px; font-weight: bold; display: inline-block;">Approve Tailor</a>
+              </div>
+              
+              <p>Best regards,<br>The needle360° Team</p>
+              ${EMAIL_SIGNATURE}
+          </div>
+      </div>
+      <div style="text-align: center; margin-top: 20px; color: #888; font-size: 0.8em;">
+          <p>This is an automated message. Please do not reply to this email.</p>
+          <p>© ${new Date().getFullYear()} needle360°. All rights reserved.</p>
+      </div>
+  </body>
+  </html>
+`;

@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import ROLES from "../constants.js";
+import { sendWelcomeEmail } from "../mailtrap/emails.js";
 
 export const approveTailorById = async (req, res) => {
   try {
@@ -31,7 +32,7 @@ export const approveTailorById = async (req, res) => {
         $set: {
           isApproved: true,
           approvedAt: new Date(),
-          approvedBy: req.user ? req.user._id : null, // Assuming req.user exists from auth middleware
+          approvedBy: req.user ? req.user._id : null,
         },
       }
     );
@@ -44,6 +45,16 @@ export const approveTailorById = async (req, res) => {
     const updatedTailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
     });
+
+    // Send welcome email to approved tailor
+    try {
+      await sendWelcomeEmail(updatedTailor.email, updatedTailor.name);
+    } catch (emailError) {
+      console.error(
+        "Failed to send welcome email to approved tailor:",
+        emailError
+      );
+    }
 
     // Remove sensitive data
     const {
