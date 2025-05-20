@@ -13,7 +13,7 @@ passport.use(
       callbackURL:
         "https://needle360.online/api/auth/google/callback" ||
         "http://localhost:4000/api/auth/google/callback",
-      passReqToCallback: true, // Add this to access the request in the callback
+      passReqToCallback: true,
     },
     async (req, accessToken, refreshToken, profile, done) => {
       try {
@@ -26,8 +26,14 @@ passport.use(
           return done(null, existingUser);
         }
 
-        // Get role from session (set in the auth route)
+        // Only allow role: 1 (USER) for Google OAuth
         const role = req.session?.userRole || ROLES.USER;
+        if (role !== ROLES.USER) {
+          return done(
+            new Error("Google OAuth is only available for customers"),
+            null
+          );
+        }
 
         // Create new user
         const registrationNumber = await generateRegistrationNumber(db, role);
@@ -38,7 +44,7 @@ passport.use(
           name: profile.displayName,
           role: role,
           isVerified: false,
-          isApproved: role === ROLES.USER, // Auto-approve only customers
+          isApproved: role === ROLES.USER,
           registrationNumber,
           createdAt: new Date(),
         };

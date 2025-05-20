@@ -24,8 +24,10 @@ const router = express.Router();
 router.get(
   "/google",
   (req, res, next) => {
-    // Store the role in session if provided
-    const role = parseInt(req.query.role) || ROLES.USER; // Default to regular user if not specified
+    const role = parseInt(req.query.role) || ROLES.USER;
+    if (role !== ROLES.USER) {
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=invalid_role`);
+    }
     req.session = req.session || {};
     req.session.userRole = role;
     next();

@@ -230,14 +230,15 @@ export const signup = async (req, res) => {
       throw new Error("Failed to create account in database");
     }
 
+    const token = generateTokenAndSetCookie(res, result.insertedId);
+
     try {
       await sendVerificationEmail(email, verificationToken);
-
-      generateTokenAndSetCookie(res, result.insertedId);
 
       return res.status(201).json({
         success: true,
         message: "Account created successfully! Please verify your email.",
+        token,
         user: {
           _id: result.insertedId,
           email,
@@ -257,11 +258,11 @@ export const signup = async (req, res) => {
     } catch (emailError) {
       console.error("Email sending error:", emailError);
 
-      // Don't delete the user if email fails - allow them to request a new verification email later
       return res.status(201).json({
         success: true,
         message:
           "Account created but we couldn't send the verification email. Please request a new verification email later.",
+        token,
         user: {
           _id: result.insertedId,
           email,
@@ -327,6 +328,8 @@ export const verifyEmail = async (req, res) => {
       }
     );
 
+    const token = generateTokenAndSetCookie(res, user._id);
+
     try {
       await sendWelcomeEmail(user.email, user.name);
     } catch (emailError) {
@@ -340,6 +343,7 @@ export const verifyEmail = async (req, res) => {
       name: user.name,
       role: user.role,
       isVerified: true,
+      isApproved: user.isApproved,
       registrationNumber: user.registrationNumber,
       contactNumber: user.contactNumber,
       address: user.address,
@@ -352,6 +356,7 @@ export const verifyEmail = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Email verified successfully! Welcome aboard!",
+      token,
       user: userResponse,
       source: "verifyEmail",
     });
@@ -405,12 +410,14 @@ export const login = async (req, res) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      isVerified: user.isVerified,
+      isApproved: user.isApproved,
+      registrationNumber: user.registrationNumber,
       contactNumber: user.contactNumber,
       address: user.address,
       shopName: user.shopName,
       shopAddress: user.shopAddress,
       shopRegistrationNumber: user.shopRegistrationNumber,
-      registrationNumber: user.registrationNumber,
       logoUrl: user.logoUrl,
     };
 
@@ -571,7 +578,22 @@ export const checkAuth = async (req, res) => {
       .collection("users")
       .findOne(
         { _id: new mongoose.Types.ObjectId(req.userId) },
-        { projection: { email: 1, role: 1, isVerified: 1, isApproved: 1 } }
+        {
+          projection: {
+            email: 1,
+            role: 1,
+            isVerified: 1,
+            isApproved: 1,
+            registrationNumber: 1,
+            name: 1,
+            contactNumber: 1,
+            address: 1,
+            shopName: 1,
+            shopAddress: 1,
+            shopRegistrationNumber: 1,
+            logoUrl: 1,
+          },
+        }
       );
 
     if (!user) {
@@ -589,9 +611,17 @@ export const checkAuth = async (req, res) => {
       user: {
         _id: user._id,
         email: user.email,
+        name: user.name,
         role: user.role,
         isVerified: user.isVerified,
         isApproved: user.isApproved,
+        registrationNumber: user.registrationNumber,
+        contactNumber: user.contactNumber,
+        address: user.address,
+        shopName: user.shopName,
+        shopAddress: user.shopAddress,
+        shopRegistrationNumber: user.shopRegistrationNumber,
+        logoUrl: user.logoUrl,
       },
       token,
       source: "checkAuth",
