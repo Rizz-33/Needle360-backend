@@ -3,22 +3,21 @@ import mongoose from "mongoose";
 
 dotenv.config();
 
-const password = encodeURIComponent(process.env.MONGODB_PASSWORD);
-const connectionString = `mongodb+srv://risiniamarathunga:${password}@devcluster.4xxln.mongodb.net/database?retryWrites=true&w=majority&appName=DevCluster`;
-
-mongoose.connection.on("connected", () => {
-  console.log("MongoDB connected");
-});
-
-mongoose.connection.on("error", (err) => {
-  console.error(`MongoDB connection error: ${err}`);
-});
-
 export async function connectToMongoDB() {
   try {
+    // Use the local MongoDB connection string from your .env
+    const connectionString =
+      process.env.MONGODB_CONNECTION_STRING ||
+      `mongodb+srv://risiniamarathunga:${encodeURIComponent(
+        process.env.MONGODB_PASSWORD
+      )}@devcluster.4xxln.mongodb.net/database?retryWrites=true&w=majority`;
+
     await mongoose.connect(connectionString, {
-      serverSelectionTimeoutMS: 30000,
+      serverSelectionTimeoutMS: 5000,
+      connectTimeoutMS: 10000,
       socketTimeoutMS: 45000,
+      retryWrites: true,
+      retryReads: true,
     });
     console.log("Connected to MongoDB with Mongoose");
   } catch (e) {
