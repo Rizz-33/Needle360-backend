@@ -7,9 +7,8 @@ import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 
 // Dynamic callback URL based on environment
 const callbackURL =
-  process.env.NODE_ENV === "production"
-    ? `${process.env.API_URL}/api/auth/google/callback`
-    : "/api/auth/google/callback";
+  "https://needle360.online/api/auth/google/callback" ||
+  "http://localhost:4000/api/auth/google/callback";
 
 passport.use(
   new GoogleStrategy(
