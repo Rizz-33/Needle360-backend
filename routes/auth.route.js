@@ -37,7 +37,7 @@ router.get(
       const user = req.user;
       const token = generateTokenAndSetCookie(res, user._id);
 
-      // Generate verification token if user is not verified
+      // If user is not verified, send verification email
       if (!user.isVerified) {
         const verificationToken = Math.floor(
           100000 + Math.random() * 900000
@@ -55,7 +55,6 @@ router.get(
           }
         );
 
-        // Send verification email
         await sendVerificationEmail(user.email, verificationToken);
       }
 

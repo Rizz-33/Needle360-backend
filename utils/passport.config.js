@@ -3,109 +3,80 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import ROLES from "../constants.js";
 import { generateRegistrationNumber } from "../controllers/auth.controller.js";
-import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 
-// Dynamic callback URL based on environment
-const callbackURL =
-  "https://needle360.online/api/auth/google/callback" ||
-  "http://localhost:4000/api/auth/google/callback";
-
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: callbackURL,
-      scope: ["profile", "email"],
-      passReqToCallback: true,
-    },
-    async (req, accessToken, refreshToken, profile, done) => {
-      try {
-        const db = mongoose.connection.db;
-        const email = profile.emails[0].value;
-        const googleId = profile.id;
-
-        // Check if user already exists
-        let user = await db.collection("users").findOne({ googleId });
-
-        if (!user) {
-          user = await db
+const configurePassport = () => {
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL:
+          "https://needle360.online/api/auth/google/callback" ||
+          "http://localhost:4000/api/auth/google/callback",
+      },
+      async (accessToken, refreshToken, profile, done) => {
+        try {
+          const db = mongoose.connection.db;
+          const existingUser = await db
             .collection("users")
-            .findOne({ email: { $regex: new RegExp(`^${email}$`, "i") } });
+            .findOne({ email: profile.emails[0].value });
 
-          if (user) {
-            // Link Google account to existing user
-            await db
-              .collection("users")
-              .updateOne({ _id: user._id }, { $set: { googleId } });
-          } else {
-            // Create new user
-            const registrationNumber = await generateRegistrationNumber(
-              db,
-              ROLES.USER
-            );
-            const verificationToken = Math.floor(
-              100000 + Math.random() * 900000
-            ).toString();
-            const verificationTokenExpires = Date.now() + 3600000;
-
-            const newUser = {
-              googleId,
-              email,
-              name: profile.displayName,
-              role: ROLES.USER,
-              isApproved: true,
-              isVerified: false,
-              registrationNumber,
-              verificationToken,
-              verificationTokenExpires,
-              createdAt: new Date(),
-              contactNumber: "",
-              address: "",
-            };
-
-            const result = await db.collection("users").insertOne(newUser);
-            user = { _id: result.insertedId, ...newUser };
-
-            try {
-              await sendVerificationEmail(email, verificationToken);
-            } catch (emailError) {
-              console.error("Failed to send verification email:", emailError);
-            }
+          if (existingUser) {
+            return done(null, existingUser);
           }
-        }
 
-        if (user.isVerified) {
-          try {
-            await sendWelcomeEmail(user.email, user.name);
-          } catch (emailError) {
-            console.warn("Failed to send welcome email:", emailError);
+          // Create new user
+          const registrationNumber = await generateRegistrationNumber(
+            db,
+            ROLES.USER
+          );
+
+          const newUser = {
+            googleId: profile.id,
+            email: profile.emails[0].value,
+            name: profile.displayName,
+            role: ROLES.USER,
+            isVerified: false, // Mark as unverified initially
+            isApproved: true, // Auto-approve Google signups
+            registrationNumber,
+            createdAt: new Date(),
+          };
+
+          const result = await db.collection("users").insertOne(newUser);
+
+          if (!result.acknowledged || !result.insertedId) {
+            throw new Error("Failed to create user in database");
           }
-        }
 
-        done(null, user);
-      } catch (error) {
-        console.error("Google OAuth error:", error);
-        done(error, null);
+          const createdUser = {
+            ...newUser,
+            _id: result.insertedId,
+          };
+
+          done(null, createdUser);
+        } catch (error) {
+          console.error("Google OAuth error:", error);
+          done(error, null);
+        }
       }
+    )
+  );
+
+  passport.serializeUser((user, done) => {
+    done(null, user._id);
+  });
+
+  passport.deserializeUser(async (id, done) => {
+    try {
+      const db = mongoose.connection.db;
+      const user = await db
+        .collection("users")
+        .findOne({ _id: new mongoose.Types.ObjectId(id) });
+      done(null, user);
+    } catch (error) {
+      done(error, null);
     }
-  )
-);
+  });
+};
 
-passport.serializeUser((user, done) => {
-  done(null, user._id.toString());
-});
-
-passport.deserializeUser(async (id, done) => {
-  try {
-    const db = mongoose.connection.db;
-    const user = await db
-      .collection("users")
-      .findOne({ _id: new mongoose.Types.ObjectId(id) });
-    done(null, user);
-  } catch (error) {
-    done(error, null);
-  }
-});
-
-export default passport;
+export default configurePassport;
