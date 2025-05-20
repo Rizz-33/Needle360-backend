@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import express from "express";
 import session from "express-session";
 import http from "http";
+import passport from "passport";
 import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
@@ -22,7 +23,7 @@ import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
-import passport from "./utils/passport.config.js";
+import "./utils/passport.config.js";
 
 dotenv.config();
 
@@ -84,6 +85,17 @@ app.use(
     credentials: true,
   })
 );
+
+// Parse JSON bodies (except for Stripe webhook)
+app.use((req, res, next) => {
+  if (req.originalUrl === "/api/webhook/stripe") {
+    next();
+  } else {
+    express.json({ limit: "16mb" })(req, res, next);
+  }
+});
+
+app.use(cookieParser());
 
 // Session middleware
 app.use(
@@ -155,17 +167,12 @@ io.on("connection", (socket) => {
 
 const port = process.env.PORT || 4000;
 
-// Parse JSON bodies
-app.use(express.json({ limit: "16mb" }));
-
 // Parse raw bodies for Stripe webhook
 app.use(
   "/api/webhook/stripe",
   express.raw({ type: "application/json" }),
   handleStripeWebhook
 );
-
-app.use(cookieParser());
 
 // Connect MongoDB and start server
 connectToMongoDB()

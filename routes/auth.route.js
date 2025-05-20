@@ -1,4 +1,6 @@
 import express from "express";
+import mongoose from "mongoose";
+import passport from "passport";
 import {
   checkAuth,
   checkIsApproved,
@@ -11,9 +13,9 @@ import {
   signup,
   verifyEmail,
 } from "../controllers/auth.controller.js";
+import { sendVerificationEmail } from "../mailtrap/emails.js";
 import { verifyToken } from "../middleware/verifyToken.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import passport from "../utils/passport.config.js";
 
 const router = express.Router();
 
