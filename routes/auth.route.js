@@ -102,12 +102,11 @@ router.get(
         logoUrl: user.logoUrl,
       };
 
-      // Redirect based on role and verification status
       let redirectUrl;
       if (user.isVerified) {
         redirectUrl = `${
           process.env.CLIENT_URL
-        }/design?token=${token}&user=${encodeURIComponent(
+        }/?token=${token}&user=${encodeURIComponent(
           JSON.stringify(userResponse)
         )}`;
       } else {
