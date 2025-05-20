@@ -19,18 +19,23 @@ const router = express.Router();
 // Google OAuth routes
 router.get(
   "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+    prompt: "select_account",
+  })
 );
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
+  passport.authenticate("google", {
+    failureRedirect: `${process.env.CLIENT_URL}/login?error=auth_failed`,
+    session: false,
+  }),
   (req, res) => {
     try {
       const user = req.user;
       const token = generateTokenAndSetCookie(res, user._id);
 
-      // Construct user response
       const userResponse = {
         _id: user._id,
         email: user.email,
@@ -47,7 +52,6 @@ router.get(
         logoUrl: user.logoUrl,
       };
 
-      // Redirect to frontend with token and user data
       const redirectUrl = user.isVerified
         ? `${
             process.env.CLIENT_URL

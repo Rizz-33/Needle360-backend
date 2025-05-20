@@ -2,18 +2,25 @@ import mongoose from "mongoose";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import ROLES from "../constants.js";
-import { generateRegistrationNumber } from "../controllers/auth.controller.js"; // Changed to named import
+import { generateRegistrationNumber } from "../controllers/auth.controller.js";
 import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
+
+// Dynamic callback URL based on environment
+const callbackURL =
+  process.env.NODE_ENV === "production"
+    ? `${process.env.API_URL}/api/auth/google/callback`
+    : "/api/auth/google/callback";
 
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: "/api/auth/google/callback",
+      callbackURL: callbackURL,
       scope: ["profile", "email"],
+      passReqToCallback: true,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         const db = mongoose.connection.db;
         const email = profile.emails[0].value;
@@ -49,20 +56,18 @@ passport.use(
               name: profile.displayName,
               role: ROLES.USER,
               isApproved: true,
-              isVerified: false, // Require email verification
+              isVerified: false,
               registrationNumber,
               verificationToken,
               verificationTokenExpires,
               createdAt: new Date(),
-              contactNumber: "", // Default empty, can be updated later
-              address: "", // Default empty
+              contactNumber: "",
+              address: "",
             };
 
             const result = await db.collection("users").insertOne(newUser);
-
             user = { _id: result.insertedId, ...newUser };
 
-            // Send verification email
             try {
               await sendVerificationEmail(email, verificationToken);
             } catch (emailError) {
@@ -71,7 +76,6 @@ passport.use(
           }
         }
 
-        // If user is verified, send welcome email (if not already sent)
         if (user.isVerified) {
           try {
             await sendWelcomeEmail(user.email, user.name);
@@ -89,12 +93,10 @@ passport.use(
   )
 );
 
-// Serialize user to session
 passport.serializeUser((user, done) => {
   done(null, user._id.toString());
 });
 
-// Deserialize user from session
 passport.deserializeUser(async (id, done) => {
   try {
     const db = mongoose.connection.db;
