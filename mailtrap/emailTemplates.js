@@ -29,7 +29,7 @@ const EMAIL_SIGNATURE = `
       </tr>
     </table>
   </div>
-  `;
+`;
 
 export const VERIFICATION_EMAIL_TEMPLATE = `
   <!DOCTYPE html>
@@ -76,7 +76,7 @@ export const VERIFICATION_EMAIL_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const WELCOME_EMAIL_TEMPLATE = `
   <!DOCTYPE html>
@@ -128,7 +128,7 @@ export const WELCOME_EMAIL_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const PASSWORD_RESET_SUCCESS_TEMPLATE = `
   <!DOCTYPE html>
@@ -182,7 +182,7 @@ export const PASSWORD_RESET_SUCCESS_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const PASSWORD_RESET_REQUEST_TEMPLATE = `
   <!DOCTYPE html>
@@ -228,7 +228,7 @@ export const PASSWORD_RESET_REQUEST_TEMPLATE = `
       </div>
   </body>
   </html>
-  `;
+`;
 
 export const TAILOR_APPROVAL_NOTIFICATION_TEMPLATE = `
   <!DOCTYPE html>

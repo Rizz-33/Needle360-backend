@@ -231,11 +231,8 @@ export const signup = async (req, res) => {
 
     const token = generateTokenAndSetCookie(res, result.insertedId);
 
-    if (
-      result.acknowledged &&
-      result.insertedId &&
-      role === ROLES.TAILOR_SHOP_OWNER
-    ) {
+    // Send tailor approval notification if user is a tailor
+    if (role === ROLES.TAILOR_SHOP_OWNER) {
       try {
         const approvalLink = `${process.env.ADMIN_URL}/admin/tailors/${result.insertedId}/approve`;
         await sendTailorApprovalNotification(user, approvalLink);

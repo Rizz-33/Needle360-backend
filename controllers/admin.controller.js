@@ -25,29 +25,6 @@ export const approveTailorById = async (req, res) => {
       });
     }
 
-    if (result.modifiedCount > 0) {
-      try {
-        await sendWelcomeEmail(updatedTailor.email, updatedTailor.name);
-      } catch (emailError) {
-        console.error(
-          "Failed to send welcome email to approved tailor:",
-          emailError
-        );
-      }
-
-      const {
-        password,
-        resetPasswordToken,
-        resetPasswordExpires,
-        ...tailorDetails
-      } = updatedTailor;
-
-      res.status(200).json({
-        message: "Tailor approved successfully",
-        tailor: tailorDetails,
-      });
-    }
-
     // Update the tailor's approval status
     const result = await db.collection("users").updateOne(
       { _id: new mongoose.Types.ObjectId(id) },
@@ -55,7 +32,7 @@ export const approveTailorById = async (req, res) => {
         $set: {
           isApproved: true,
           approvedAt: new Date(),
-          approvedBy: req.user ? req.user._id : null, // Assuming req.user exists from auth middleware
+          approvedBy: req.user ? req.user._id : null,
         },
       }
     );
@@ -68,6 +45,16 @@ export const approveTailorById = async (req, res) => {
     const updatedTailor = await db.collection("users").findOne({
       _id: new mongoose.Types.ObjectId(id),
     });
+
+    // Send welcome email to approved tailor
+    try {
+      await sendWelcomeEmail(updatedTailor.email, updatedTailor.name);
+    } catch (emailError) {
+      console.error(
+        "Failed to send welcome email to approved tailor:",
+        emailError
+      );
+    }
 
     // Remove sensitive data
     const {

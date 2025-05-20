@@ -73,9 +73,9 @@ export const sendWelcomeEmail = async (email, name) => {
     console.log(
       `Welcome email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(`Failed to send welcome email to ${email}: ${error.message}`);
-
     throw new Error(`Failed to send welcome email: ${error.message}`);
   }
 };
@@ -99,11 +99,11 @@ export const sendPasswordResetEmail = async (email, resetURL) => {
     console.log(
       `Password reset email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(
       `Failed to send password reset email to ${email}: ${error.message}`
     );
-
     throw new Error(`Failed to send password reset email: ${error.message}`);
   }
 };
@@ -127,11 +127,11 @@ export const sendResetPasswordConfirmationEmail = async (email) => {
     console.log(
       `Password reset confirmation email sent successfully to ${email}. Response ID: ${response.id}`
     );
+    return response;
   } catch (error) {
     console.error(
       `Failed to send password reset confirmation email to ${email}: ${error.message}`
     );
-
     throw new Error(
       `Failed to send password reset confirmation email: ${error.message}`
     );
