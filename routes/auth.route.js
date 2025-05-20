@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import passport from "passport";
+import ROLES from "../constants.js";
 import {
   checkAuth,
   checkIsApproved,
@@ -19,9 +20,16 @@ import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js
 
 const router = express.Router();
 
-// Google OAuth routes
+// Google OAuth routes with role query parameter
 router.get(
   "/google",
+  (req, res, next) => {
+    // Store the role in session if provided
+    const role = parseInt(req.query.role) || ROLES.USER; // Default to regular user if not specified
+    req.session = req.session || {};
+    req.session.userRole = role;
+    next();
+  },
   passport.authenticate("google", {
     scope: ["profile", "email"],
     prompt: "select_account",
@@ -37,6 +45,24 @@ router.get(
   async (req, res) => {
     try {
       const user = req.user;
+
+      // If this is a new user, update their role if it was specified during the initial request
+      if (req.session && req.session.userRole) {
+        const db = mongoose.connection.db;
+        await db.collection("users").updateOne(
+          { _id: user._id },
+          {
+            $set: { role: req.session.userRole },
+          }
+        );
+
+        // Update the user object with the new role
+        user.role = req.session.userRole;
+
+        // Clear session after use
+        delete req.session.userRole;
+      }
+
       const token = generateTokenAndSetCookie(res, user._id);
 
       // If user is not verified, send verification email
@@ -76,17 +102,21 @@ router.get(
         logoUrl: user.logoUrl,
       };
 
-      const redirectUrl = user.isVerified
-        ? `${
-            process.env.CLIENT_URL
-          }/design?token=${token}&user=${encodeURIComponent(
-            JSON.stringify(userResponse)
-          )}`
-        : `${
-            process.env.CLIENT_URL
-          }/verify-email?token=${token}&email=${encodeURIComponent(
-            user.email
-          )}`;
+      // Redirect based on role and verification status
+      let redirectUrl;
+      if (user.isVerified) {
+        redirectUrl = `${
+          process.env.CLIENT_URL
+        }/design?token=${token}&user=${encodeURIComponent(
+          JSON.stringify(userResponse)
+        )}`;
+      } else {
+        redirectUrl = `${
+          process.env.CLIENT_URL
+        }/verify-email?token=${token}&user=${encodeURIComponent(
+          JSON.stringify(userResponse)
+        )}`;
+      }
 
       res.redirect(redirectUrl);
     } catch (error) {

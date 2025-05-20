@@ -13,8 +13,9 @@ passport.use(
       callbackURL:
         "https://needle360.online/api/auth/google/callback" ||
         "http://localhost:4000/api/auth/google/callback",
+      passReqToCallback: true, // Add this to access the request in the callback
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (req, accessToken, refreshToken, profile, done) => {
       try {
         const db = mongoose.connection.db;
         const existingUser = await db
@@ -25,19 +26,19 @@ passport.use(
           return done(null, existingUser);
         }
 
+        // Get role from session (set in the auth route)
+        const role = req.session?.userRole || ROLES.USER;
+
         // Create new user
-        const registrationNumber = await generateRegistrationNumber(
-          db,
-          ROLES.USER
-        );
+        const registrationNumber = await generateRegistrationNumber(db, role);
 
         const newUser = {
           googleId: profile.id,
           email: profile.emails[0].value,
           name: profile.displayName,
-          role: ROLES.USER,
-          isVerified: false, // Mark as unverified initially
-          isApproved: true, // Auto-approve Google signups
+          role: role,
+          isVerified: false,
+          isApproved: role === ROLES.USER, // Auto-approve only customers
           registrationNumber,
           createdAt: new Date(),
         };
