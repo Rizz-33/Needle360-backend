@@ -234,7 +234,7 @@ export const signup = async (req, res) => {
     // Send tailor approval notification if user is a tailor
     if (role === ROLES.TAILOR_SHOP_OWNER) {
       try {
-        const approvalLink = `${process.env.ADMIN_URL}/admin/tailors/${result.insertedId}/approve`;
+        const approvalLink = `${process.env.API_URL}/admin/tailors/${result.insertedId}/approve`;
         await sendTailorApprovalNotification(user, approvalLink);
       } catch (emailError) {
         console.error(
