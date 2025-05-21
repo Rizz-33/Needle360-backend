@@ -24,10 +24,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
       - name: Validate Environment Variables
         run: |
-          if [ -z "${{ secrets.MONGO_URI }}" ]; then
-            echo "Error: MONGO_URI is not set"
-            exit 1
-          fi
           if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
             echo "Error: STRIPE_SECRET_KEY is not set"
             exit 1
