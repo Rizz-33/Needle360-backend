@@ -15,16 +15,27 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
-
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
+      - name: Validate Environment Variables
+        run: |
+          if [ -z "${{ secrets.MONGO_URI }}" ]; then
+            echo "Error: MONGO_URI is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
+            echo "Error: STRIPE_SECRET_KEY is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.STRIPE_WEBHOOK_SECRET }}" ]; then
+            echo "Error: STRIPE_WEBHOOK_SECRET is not set"
+            exit 1
+          fi
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -46,19 +57,14 @@ jobs:
           rm -rf /root/.npm/_cacache || true
           df -h
         continue-on-error: true
-
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
-
       - name: Stop Existing Container
         run: docker stop needle360-backend-container || true
-
       - name: Remove Existing Container
         run: docker rm needle360-backend-container || true
-
       - name: Create or Join Docker Network
         run: docker network create needle360-network || true
-
       - name: Start MongoDB Container
         run: |
           docker run -d \
@@ -67,7 +73,6 @@ jobs:
             --network needle360-network \
             -v mongodb_data:/data/db \
             mongo:latest || true
-
       - name: Run Docker Container
         run: |
           docker run -d \
@@ -90,13 +95,11 @@ jobs:
             -e STRIPE_WEBHOOK_SECRET='${{ secrets.STRIPE_WEBHOOK_SECRET }}' \
             --restart unless-stopped \
             rizz336/needle360-backend:latest
-
       - name: Verify Container Running
         run: |
           sleep 10
           docker ps -a
           docker logs needle360-backend-container
-
       - name: Wait for backend to be ready
         run: |
           echo "Waiting for backend to be ready..."
@@ -106,6 +109,7 @@ jobs:
               exit 0
             fi
             echo "Attempt $i: Backend not ready yet"
+            docker logs needle360-backend-container
             sleep 5
           done
           echo "Backend did not become ready after 10 attempts"
