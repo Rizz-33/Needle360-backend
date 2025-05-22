@@ -5,7 +5,6 @@ import express from "express";
 import session from "express-session";
 import http from "http";
 import passport from "passport";
-import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 import webhookRoutes from "./mailtrap/webhookController.js";
@@ -23,6 +22,7 @@ import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
+import initializeSocketServer from "./socket-server.js";
 import "./utils/passport.config.js";
 
 dotenv.config();
@@ -47,7 +47,7 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
-const httpServer = http.createServer(app);
+const server = http.createServer(app);
 
 // CORS configuration
 const allowedOrigins = [
@@ -115,54 +115,13 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Socket.IO initialization
-export const io = new Server(httpServer, {
-  cors: {
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.some((allowed) =>
-          typeof allowed === "string"
-            ? allowed === origin
-            : allowed.test(origin)
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.warn(`Blocked CORS request from origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+// Initialize Socket.IO server
+const io = initializeSocketServer(server);
 
-app.set("io", io);
-
-// Socket.IO event handling
-io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
-
-  socket.on("joinConversation", (conversationId) => {
-    console.log(`Socket ${socket.id} joining conversation: ${conversationId}`);
-    socket.join(conversationId);
-  });
-
-  socket.on("leaveConversation", (conversationId) => {
-    console.log(`Socket ${socket.id} leaving conversation: ${conversationId}`);
-    socket.leave(conversationId);
-  });
-
-  socket.on("joinRoom", ({ userId, role }) => {
-    const room = `${role}:${userId}`;
-    socket.join(room);
-    console.log(`${role} ${userId} joined room: ${room}`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
-  });
+// Make io instance available in routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
 });
 
 const port = process.env.PORT || 4000;
@@ -177,6 +136,7 @@ app.use(
 // Connect MongoDB and start server
 connectToMongoDB()
   .then(() => {
+    // API routes
     app.use("/api/auth", authRoutes);
     app.use("/api/tailor", tailorRoutes);
     app.use("/api/admin", adminRoutes);
@@ -207,7 +167,7 @@ connectToMongoDB()
     });
 
     // Start the server
-    httpServer.listen(port, "0.0.0.0", () => {
+    server.listen(port, "0.0.0.0", () => {
       console.log(`Backend server is running on port ${port}`);
     });
   })

@@ -1,21 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
-import BaseUser from "../models/base-user.model.js"; // Changed from User to BaseUser
-import Conversation from "../models/conversation.model.js";
-import Message from "../models/message.model.js";
-
-const verifyJWT = (token) => {
-  try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
-    }
-    return jwt.verify(token, secret);
-  } catch (error) {
-    console.error("JWT verification error:", error);
-    return null;
-  }
-};
+import BaseUser from "../models/base-user.model.js";
 
 const initializeSocketServer = (server) => {
   const io = new Server(server, {
@@ -24,119 +9,103 @@ const initializeSocketServer = (server) => {
       methods: ["GET", "POST"],
       credentials: true,
     },
+    transports: ["websocket", "polling"], // Explicitly set transports
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+      skipMiddlewares: true,
+    },
   });
 
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth.token;
       if (!token) {
+        console.log("No token provided");
         return next(new Error("Authentication error: Token not provided"));
       }
 
-      const decoded = verifyJWT(token);
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       if (!decoded) {
+        console.log("Invalid token");
         return next(new Error("Authentication error: Invalid token"));
       }
 
       const userId = decoded.userId || decoded.id || decoded._id;
       if (!userId) {
+        console.log("No user ID in token");
         return next(
           new Error("Authentication error: User ID not found in token")
         );
       }
 
-      const user = await BaseUser.findById(userId).select("-password"); // Changed from User to BaseUser
+      const user = await BaseUser.findById(userId).select("-password");
       if (!user) {
+        console.log("User not found");
         return next(new Error("Authentication error: User not found"));
       }
 
       socket.user = user;
+      console.log(`Authenticated user: ${user._id}`);
       next();
     } catch (error) {
-      return next(new Error("Authentication error: " + error.message));
+      console.error("Socket middleware error:", error);
+      next(new Error("Authentication error: " + error.message));
     }
   });
 
   io.on("connection", (socket) => {
     console.log(`User connected: ${socket.user._id}`);
-
     socket.join(socket.user._id.toString());
 
-    socket.broadcast.emit("user_status_changed", {
-      userId: socket.user._id,
-      status: "online",
-    });
-
-    socket.on("join_conversation", (conversationId) => {
+    // Join conversation event (matches client event name)
+    socket.on("joinConversation", (conversationId) => {
       socket.join(conversationId);
       console.log(
         `User ${socket.user._id} joined conversation: ${conversationId}`
       );
     });
 
-    socket.on("send_message", async (messageData) => {
+    // Leave conversation event
+    socket.on("leaveConversation", (conversationId) => {
+      socket.leave(conversationId);
+      console.log(
+        `User ${socket.user._id} left conversation: ${conversationId}`
+      );
+    });
+
+    // New message event
+    socket.on("newMessage", async (message) => {
       try {
-        const { conversationId, content } = messageData;
+        const conversation = await Conversation.findById(message.conversation);
+        if (
+          !conversation ||
+          !conversation.participants.includes(socket.user._id)
+        ) {
+          return socket.emit("error", "Not authorized for this conversation");
+        }
 
-        const newMessage = new Message({
-          sender: socket.user._id,
-          content,
-          conversation: conversationId,
-          readBy: [socket.user._id],
-        });
-
-        const savedMessage = await newMessage.save();
-
-        await Conversation.findByIdAndUpdate(conversationId, {
-          lastMessage: savedMessage._id,
-          $inc: { messageCount: 1 },
-        });
-
-        const populatedMessage = await Message.findById(
-          savedMessage._id
-        ).populate("sender", "firstName lastName profilePicture role");
-
-        io.to(conversationId).emit("receive_message", populatedMessage);
-
-        const conversation = await Conversation.findById(
-          conversationId
-        ).populate("participants", "_id");
-
-        conversation.participants.forEach((participant) => {
-          if (participant._id.toString() !== socket.user._id.toString()) {
-            io.to(participant._id.toString()).emit("new_message_notification", {
-              conversationId,
-              message: populatedMessage,
-            });
-          }
-        });
+        io.to(message.conversation).emit("newMessage", message);
       } catch (error) {
-        console.error("Error sending message:", error);
-        socket.emit("message_error", { error: error.message });
+        console.error("Error broadcasting message:", error);
       }
     });
 
-    socket.on("typing", ({ conversationId, isTyping }) => {
-      socket.to(conversationId).emit("user_typing", {
-        userId: socket.user._id,
-        isTyping,
-      });
-    });
-
-    socket.on("mark_as_read", async ({ conversationId }) => {
+    // Mark messages as read
+    socket.on("markMessagesAsRead", async ({ conversationId, messageIds }) => {
       try {
         await Message.updateMany(
           {
+            _id: { $in: messageIds },
             conversation: conversationId,
-            sender: { $ne: socket.user._id },
             readBy: { $ne: socket.user._id },
           },
           { $addToSet: { readBy: socket.user._id } }
         );
 
-        socket.to(conversationId).emit("messages_read", {
+        io.to(conversationId).emit("messagesRead", {
           conversationId,
           readBy: socket.user._id,
+          messageIds,
         });
       } catch (error) {
         console.error("Error marking messages as read:", error);
@@ -145,10 +114,10 @@ const initializeSocketServer = (server) => {
 
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.user._id}`);
-      socket.broadcast.emit("user_status_changed", {
-        userId: socket.user._id,
-        status: "offline",
-      });
+    });
+
+    socket.on("error", (error) => {
+      console.error("Socket error:", error);
     });
   });
 
