@@ -8,6 +8,7 @@ import passport from "passport";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 import webhookRoutes from "./mailtrap/webhookController.js";
+import initializeSocketServer from "./middleware/socket.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
@@ -22,7 +23,6 @@ import reviewRoutes from "./routes/review.route.js";
 import serviceRoutes from "./routes/service.route.js";
 import tailorRoutes from "./routes/tailor.route.js";
 import userInteractionsRoutes from "./routes/user-interactions.route.js";
-import initializeSocketServer from "./socket-server.js";
 import "./utils/passport.config.js";
 
 dotenv.config();
