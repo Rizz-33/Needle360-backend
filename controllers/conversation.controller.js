@@ -22,7 +22,7 @@ export const createConversation = async (req, res) => {
     }
 
     const existingConversation = await Conversation.findOne({
-      participants: { $all: [userId, participantId] },
+      participants: { $all: [userId, participantId], $size: 2 },
     });
 
     if (existingConversation) {
@@ -32,6 +32,7 @@ export const createConversation = async (req, res) => {
     const conversation = await Conversation.create({
       participants: [userId, participantId],
       lastMessage: null,
+      isGroup: false,
     });
 
     const populatedConversation = await Conversation.findById(conversation._id)
@@ -51,6 +52,80 @@ export const createConversation = async (req, res) => {
     return res
       .status(500)
       .json({ message: "Failed to create conversation", error: error.message });
+  }
+};
+
+export const createGroupConversation = async (req, res) => {
+  try {
+    const { participantIds, groupName } = req.body;
+    const userId = req.user._id;
+
+    if (
+      !participantIds ||
+      !Array.isArray(participantIds) ||
+      participantIds.length < 1
+    ) {
+      return res
+        .status(400)
+        .json({ message: "At least one participant ID is required" });
+    }
+
+    if (participantIds.includes(userId.toString())) {
+      return res
+        .status(400)
+        .json({ message: "Creator cannot be included in participant IDs" });
+    }
+
+    const participants = await BaseUser.find({
+      _id: { $in: participantIds },
+    }).select("_id");
+
+    if (participants.length !== participantIds.length) {
+      return res
+        .status(404)
+        .json({ message: "One or more participants not found" });
+    }
+
+    const allParticipants = [userId, ...participantIds];
+
+    const existingGroup = await Conversation.findOne({
+      participants: { $all: allParticipants, $size: allParticipants.length },
+      isGroup: true,
+    });
+
+    if (existingGroup) {
+      return res.status(200).json(existingGroup);
+    }
+
+    const conversation = await Conversation.create({
+      participants: allParticipants,
+      lastMessage: null,
+      isGroup: true,
+      groupName:
+        groupName || `Group Chat ${new Date().toISOString().slice(0, 10)}`,
+    });
+
+    const populatedConversation = await Conversation.findById(conversation._id)
+      .populate("participants", "fullName email role profileImage")
+      .lean();
+
+    const io = req.app.get("io");
+    allParticipants.forEach((participantId) => {
+      io.to(participantId.toString()).emit(
+        "newConversation",
+        populatedConversation
+      );
+    });
+
+    return res.status(201).json(populatedConversation);
+  } catch (error) {
+    console.error(`Error creating group conversation: ${error.message}`);
+    return res
+      .status(500)
+      .json({
+        message: "Failed to create group conversation",
+        error: error.message,
+      });
   }
 };
 
