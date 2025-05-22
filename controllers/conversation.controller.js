@@ -1,178 +1,137 @@
 import BaseUser from "../models/base-user.model.js";
 import Conversation from "../models/conversation.model.js";
 
-export const createOrGetConversation = async (req, res) => {
+export const createConversation = async (req, res) => {
   try {
     const { participantId } = req.body;
-    const userId = req.user?._id || req.userId;
+    const userId = req.user._id;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
+    if (!participantId) {
+      return res.status(400).json({ message: "Participant ID is required" });
     }
 
-    const participant = await BaseUser.findById(participantId);
+    if (participantId === userId.toString()) {
+      return res
+        .status(400)
+        .json({ message: "Cannot create conversation with self" });
+    }
+
+    const participant = await BaseUser.findById(participantId).select("_id");
     if (!participant) {
       return res.status(404).json({ message: "Participant not found" });
     }
 
-    let conversation = await Conversation.findOne({
-      isGroup: false,
-      participants: { $all: [userId, participantId], $size: 2 },
-    })
-      .populate({
-        path: "participants",
-        select: "name role",
-      })
-      .populate({
-        path: "lastMessage",
-        populate: {
-          path: "sender",
-          select: "name",
-        },
-      });
+    const existingConversation = await Conversation.findOne({
+      participants: { $all: [userId, participantId] },
+    });
 
-    if (!conversation) {
-      conversation = new Conversation({
-        participants: [userId, participantId],
-        isGroup: false,
-      });
-      await conversation.save();
-
-      conversation = await Conversation.findById(conversation._id).populate({
-        path: "participants",
-        select: "name role",
-      });
+    if (existingConversation) {
+      return res.status(200).json(existingConversation);
     }
 
-    res.status(200).json(conversation);
+    const conversation = await Conversation.create({
+      participants: [userId, participantId],
+      lastMessage: null,
+    });
+
+    const populatedConversation = await Conversation.findById(conversation._id)
+      .populate("participants", "fullName email role profileImage")
+      .lean();
+
+    const io = req.app.get("io");
+    io.to(userId.toString()).emit("newConversation", populatedConversation);
+    io.to(participantId.toString()).emit(
+      "newConversation",
+      populatedConversation
+    );
+
+    return res.status(201).json(populatedConversation);
   } catch (error) {
-    console.error("Error in createOrGetConversation:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error(`Error creating conversation: ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: "Failed to create conversation", error: error.message });
   }
 };
 
-export const getUserConversations = async (req, res) => {
+export const getConversations = async (req, res) => {
   try {
-    const userId = req.user?._id || req.userId;
-
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
+    const userId = req.user._id;
 
     const conversations = await Conversation.find({
       participants: userId,
     })
-      .populate({
-        path: "participants",
-        select: "name role",
-      })
-      .populate({
-        path: "lastMessage",
-        populate: {
-          path: "sender",
-          select: "name",
-        },
-      })
-      .sort({ updatedAt: -1 });
+      .populate("participants", "fullName email role profileImage")
+      .populate("lastMessage")
+      .sort({ updatedAt: -1 })
+      .lean();
 
-    res.status(200).json(conversations);
+    return res.status(200).json(conversations);
   } catch (error) {
-    console.error("Error in getUserConversations:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error(`Error fetching conversations: ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch conversations", error: error.message });
   }
 };
 
 export const getConversationById = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const userId = req.user?._id || req.userId;
+    const userId = req.user._id;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    const conversation = await Conversation.findById(conversationId)
-      .populate({
-        path: "participants",
-        select: "name role",
-      })
-      .populate({
-        path: "lastMessage",
-        populate: {
-          path: "sender",
-          select: "name",
-        },
-      });
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: userId,
+    })
+      .populate("participants", "fullName email role profileImage")
+      .populate("lastMessage")
+      .lean();
 
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
 
-    if (
-      !conversation.participants.some(
-        (p) => p._id.toString() === userId.toString()
-      )
-    ) {
-      return res
-        .status(403)
-        .json({ message: "You don't have access to this conversation" });
-    }
-
-    res.status(200).json(conversation);
+    return res.status(200).json(conversation);
   } catch (error) {
-    console.error("Error in getConversationById:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error(`Error fetching conversation: ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: "Failed to fetch conversation", error: error.message });
   }
 };
 
-export const createGroupConversation = async (req, res) => {
+export const deleteConversation = async (req, res) => {
   try {
-    const { title, participantIds } = req.body;
-    const userId = req.user?._id || req.userId;
+    const { conversationId } = req.params;
+    const userId = req.user._id;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    if (!title || !participantIds || participantIds.length < 2) {
-      return res.status(400).json({
-        message:
-          "Group conversation requires a title and at least 2 other participants",
-      });
-    }
-
-    const allParticipants = [
-      ...new Set([userId.toString(), ...participantIds]),
-    ];
-
-    const participantsExist = await BaseUser.find({
-      _id: { $in: allParticipants },
-    }).countDocuments();
-
-    if (participantsExist !== allParticipants.length) {
-      return res
-        .status(400)
-        .json({ message: "One or more participants do not exist" });
-    }
-
-    const conversation = new Conversation({
-      title,
-      participants: allParticipants,
-      isGroup: true,
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: userId,
     });
 
-    await conversation.save();
+    if (!conversation) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
 
-    const populatedConversation = await Conversation.findById(
-      conversation._id
-    ).populate({
-      path: "participants",
-      select: "name role",
+    await Conversation.deleteOne({ _id: conversationId });
+
+    const io = req.app.get("io");
+    conversation.participants.forEach((participantId) => {
+      io.to(participantId.toString()).emit(
+        "conversationDeleted",
+        conversationId
+      );
     });
 
-    res.status(201).json(populatedConversation);
+    return res
+      .status(200)
+      .json({ message: "Conversation deleted successfully" });
   } catch (error) {
-    console.error("Error in createGroupConversation:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error(`Error deleting conversation: ${error.message}`);
+    return res
+      .status(500)
+      .json({ message: "Failed to delete conversation", error: error.message });
   }
 };
