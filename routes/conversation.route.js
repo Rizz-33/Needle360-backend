@@ -1,11 +1,12 @@
+// routes/conversation.route.js
 import express from "express";
 import {
-  createConversation,
   createGroupConversation,
+  createOrGetConversation,
   getConversationById,
-  getConversations,
+  getUserConversations,
 } from "../controllers/conversation.controller.js";
-import { verifyToken } from "../middleware/verifyToken.js";
+import { verifyToken } from "../middleware/verifyToken.js"; // Adjust the import path to your actual verify token middleware
 
 const router = express.Router();
 
@@ -13,8 +14,8 @@ const router = express.Router();
 router.use(verifyToken);
 
 // Routes
-router.post("/", createConversation);
-router.get("/", getConversations);
+router.post("/", createOrGetConversation);
+router.get("/", getUserConversations);
 router.get("/:conversationId", getConversationById);
 router.post("/group", createGroupConversation);
 
