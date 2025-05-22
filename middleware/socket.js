@@ -3,13 +3,39 @@ import { Server } from "socket.io";
 import BaseUser from "../models/base-user.model.js";
 
 const initializeSocketServer = (server) => {
+  const allowedOrigins = [
+    "https://needle360.online",
+    "http://www.needle360.online",
+    "https://www.needle360.online",
+    "http://localhost:5173",
+    "http://172.20.10.5",
+    "http://13.61.16.74",
+    /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+    /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/,
+    /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+  ].filter(Boolean);
+
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      origin: (origin, callback) => {
+        if (
+          !origin ||
+          allowedOrigins.some((allowed) =>
+            typeof allowed === "string"
+              ? allowed === origin
+              : allowed.test(origin)
+          )
+        ) {
+          callback(null, true);
+        } else {
+          console.warn(`Blocked Socket.IO CORS request from origin: ${origin}`);
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },
-    transports: ["websocket", "polling"], // Explicitly set transports
+    transports: ["websocket", "polling"],
     connectionStateRecovery: {
       maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
       skipMiddlewares: true,
@@ -18,16 +44,22 @@ const initializeSocketServer = (server) => {
 
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token;
+      const token =
+        socket.handshake.auth.token ||
+        socket.handshake.headers.authorization?.split(" ")[1];
       if (!token) {
-        console.log("No token provided");
+        console.log("No token provided in Socket.IO handshake");
         return next(new Error("Authentication error: Token not provided"));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      if (!decoded) {
-        console.log("Invalid token");
-        return next(new Error("Authentication error: Invalid token"));
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        console.log("Invalid or expired token:", err.message);
+        return next(
+          new Error("Authentication error: Invalid or expired token")
+        );
       }
 
       const userId = decoded.userId || decoded.id || decoded._id;
@@ -40,16 +72,16 @@ const initializeSocketServer = (server) => {
 
       const user = await BaseUser.findById(userId).select("-password");
       if (!user) {
-        console.log("User not found");
+        console.log("User not found for ID:", userId);
         return next(new Error("Authentication error: User not found"));
       }
 
       socket.user = user;
-      console.log(`Authenticated user: ${user._id}`);
+      console.log(`Authenticated Socket.IO user: ${user._id}`);
       next();
     } catch (error) {
-      console.error("Socket middleware error:", error);
-      next(new Error("Authentication error: " + error.message));
+      console.error("Socket.IO middleware error:", error.message);
+      next(new Error(`Authentication error: ${error.message}`));
     }
   });
 
@@ -57,7 +89,6 @@ const initializeSocketServer = (server) => {
     console.log(`User connected: ${socket.user._id}`);
     socket.join(socket.user._id.toString());
 
-    // Join conversation event (matches client event name)
     socket.on("joinConversation", (conversationId) => {
       socket.join(conversationId);
       console.log(
@@ -65,7 +96,6 @@ const initializeSocketServer = (server) => {
       );
     });
 
-    // Leave conversation event
     socket.on("leaveConversation", (conversationId) => {
       socket.leave(conversationId);
       console.log(
@@ -73,7 +103,6 @@ const initializeSocketServer = (server) => {
       );
     });
 
-    // New message event
     socket.on("newMessage", async (message) => {
       try {
         const conversation = await Conversation.findById(message.conversation);
@@ -83,14 +112,13 @@ const initializeSocketServer = (server) => {
         ) {
           return socket.emit("error", "Not authorized for this conversation");
         }
-
         io.to(message.conversation).emit("newMessage", message);
       } catch (error) {
-        console.error("Error broadcasting message:", error);
+        console.error("Error broadcasting message:", error.message);
+        socket.emit("error", `Failed to broadcast message: ${error.message}`);
       }
     });
 
-    // Mark messages as read
     socket.on("markMessagesAsRead", async ({ conversationId, messageIds }) => {
       try {
         await Message.updateMany(
@@ -108,7 +136,11 @@ const initializeSocketServer = (server) => {
           messageIds,
         });
       } catch (error) {
-        console.error("Error marking messages as read:", error);
+        console.error("Error marking messages as read:", error.message);
+        socket.emit(
+          "error",
+          `Failed to mark messages as read: ${error.message}`
+        );
       }
     });
 
