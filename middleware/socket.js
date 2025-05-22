@@ -1,154 +1,143 @@
 import jwt from "jsonwebtoken";
 import { Server } from "socket.io";
-import BaseUser from "../models/base-user.model.js"; // Changed from User to BaseUser
-import Conversation from "../models/conversation.model.js";
-import Message from "../models/message.model.js";
-
-const verifyJWT = (token) => {
-  try {
-    const secret = process.env.JWT_SECRET;
-    if (!secret) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
-    }
-    return jwt.verify(token, secret);
-  } catch (error) {
-    console.error("JWT verification error:", error);
-    return null;
-  }
-};
+import BaseUser from "../models/base-user.model.js";
 
 const initializeSocketServer = (server) => {
+  const allowedOrigins = [
+    "https://needle360.online",
+    "http://www.needle360.online",
+    "https://www.needle360.online",
+    "http://localhost:5173",
+    "http://172.20.10.5",
+    "http://13.61.16.74",
+    /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+    /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/,
+    /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+  ].filter(Boolean);
+
   const io = new Server(server, {
     cors: {
-      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      origin: (origin, callback) => {
+        if (
+          !origin ||
+          allowedOrigins.some((allowed) =>
+            typeof allowed === "string"
+              ? allowed === origin
+              : allowed.test(origin)
+          )
+        ) {
+          callback(null, true);
+        } else {
+          console.warn(`Blocked Socket.IO CORS request from origin: ${origin}`);
+          callback(new Error("Not allowed by CORS"));
+        }
+      },
       methods: ["GET", "POST"],
       credentials: true,
+    },
+    transports: ["websocket", "polling"],
+    connectionStateRecovery: {
+      maxDisconnectionDuration: 2 * 60 * 1000,
+      skipMiddlewares: true,
     },
   });
 
   io.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token;
+      const token =
+        socket.handshake.auth.token ||
+        socket.handshake.headers.authorization?.split(" ")[1];
       if (!token) {
-        return next(new Error("Authentication error: Token not provided"));
+        console.error("Socket.IO: No token provided");
+        return next(new Error("Authentication error: No token provided"));
       }
 
-      const decoded = verifyJWT(token);
-      if (!decoded) {
-        return next(new Error("Authentication error: Invalid token"));
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+      } catch (err) {
+        console.error(`Socket.IO: Invalid token - ${err.message}`);
+        return next(
+          new Error(`Authentication error: Invalid or expired token`)
+        );
       }
 
       const userId = decoded.userId || decoded.id || decoded._id;
       if (!userId) {
+        console.error("Socket.IO: No user ID in token");
         return next(
           new Error("Authentication error: User ID not found in token")
         );
       }
 
-      const user = await BaseUser.findById(userId).select("-password"); // Changed from User to BaseUser
+      const user = await BaseUser.findById(userId).select("-password").lean();
       if (!user) {
+        console.error(`Socket.IO: User not found for ID ${userId}`);
         return next(new Error("Authentication error: User not found"));
       }
 
       socket.user = user;
+      console.log(`Socket.IO: Authenticated user ${user._id}`);
       next();
     } catch (error) {
-      return next(new Error("Authentication error: " + error.message));
+      console.error(`Socket.IO middleware error: ${error.message}`);
+      next(new Error(`Authentication error: ${error.message}`));
     }
   });
 
   io.on("connection", (socket) => {
-    console.log(`User connected: ${socket.user._id}`);
-
+    console.log(`Socket.IO: User connected ${socket.user._id}`);
     socket.join(socket.user._id.toString());
 
-    socket.broadcast.emit("user_status_changed", {
-      userId: socket.user._id,
-      status: "online",
-    });
-
-    socket.on("join_conversation", (conversationId) => {
+    socket.on("joinConversation", (conversationId) => {
       socket.join(conversationId);
       console.log(
-        `User ${socket.user._id} joined conversation: ${conversationId}`
+        `Socket.IO: User ${socket.user._id} joined conversation ${conversationId}`
       );
     });
 
-    socket.on("send_message", async (messageData) => {
+    socket.on("leaveConversation", (conversationId) => {
+      socket.leave(conversationId);
+      console.log(
+        `Socket.IO: User ${socket.user._id} left conversation ${conversationId}`
+      );
+    });
+
+    socket.on("newMessage", async (message) => {
       try {
-        const { conversationId, content } = messageData;
-
-        const newMessage = new Message({
-          sender: socket.user._id,
-          content,
-          conversation: conversationId,
-          readBy: [socket.user._id],
-        });
-
-        const savedMessage = await newMessage.save();
-
-        await Conversation.findByIdAndUpdate(conversationId, {
-          lastMessage: savedMessage._id,
-          $inc: { messageCount: 1 },
-        });
-
-        const populatedMessage = await Message.findById(
-          savedMessage._id
-        ).populate("sender", "firstName lastName profilePicture role");
-
-        io.to(conversationId).emit("receive_message", populatedMessage);
-
-        const conversation = await Conversation.findById(
-          conversationId
-        ).populate("participants", "_id");
-
-        conversation.participants.forEach((participant) => {
-          if (participant._id.toString() !== socket.user._id.toString()) {
-            io.to(participant._id.toString()).emit("new_message_notification", {
-              conversationId,
-              message: populatedMessage,
-            });
-          }
-        });
+        io.to(message.conversation).emit("newMessage", message);
       } catch (error) {
-        console.error("Error sending message:", error);
-        socket.emit("message_error", { error: error.message });
+        console.error(
+          `Socket.IO: Error broadcasting message - ${error.message}`
+        );
+        socket.emit("error", `Failed to broadcast message: ${error.message}`);
       }
     });
 
-    socket.on("typing", ({ conversationId, isTyping }) => {
-      socket.to(conversationId).emit("user_typing", {
-        userId: socket.user._id,
-        isTyping,
-      });
-    });
-
-    socket.on("mark_as_read", async ({ conversationId }) => {
+    socket.on("markMessagesAsRead", async ({ conversationId, messageIds }) => {
       try {
-        await Message.updateMany(
-          {
-            conversation: conversationId,
-            sender: { $ne: socket.user._id },
-            readBy: { $ne: socket.user._id },
-          },
-          { $addToSet: { readBy: socket.user._id } }
-        );
-
-        socket.to(conversationId).emit("messages_read", {
+        io.to(conversationId).emit("messagesRead", {
           conversationId,
           readBy: socket.user._id,
+          messageIds,
         });
       } catch (error) {
-        console.error("Error marking messages as read:", error);
+        console.error(
+          `Socket.IO: Error broadcasting read status - ${error.message}`
+        );
+        socket.emit(
+          "error",
+          `Failed to broadcast read status: ${error.message}`
+        );
       }
     });
 
     socket.on("disconnect", () => {
-      console.log(`User disconnected: ${socket.user._id}`);
-      socket.broadcast.emit("user_status_changed", {
-        userId: socket.user._id,
-        status: "offline",
-      });
+      console.log(`Socket.IO: User disconnected ${socket.user._id}`);
+    });
+
+    socket.on("error", (error) => {
+      console.error(`Socket.IO: Client error - ${error.message}`);
     });
   });
 

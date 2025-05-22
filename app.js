@@ -5,10 +5,10 @@ import express from "express";
 import session from "express-session";
 import http from "http";
 import passport from "passport";
-import { Server } from "socket.io";
 import { handleStripeWebhook } from "./controllers/payment.controller.js";
 import { connectToMongoDB } from "./db_connection.js";
 import webhookRoutes from "./mailtrap/webhookController.js";
+import initializeSocketServer from "./middleware/socket.js";
 import adminRoutes from "./routes/admin.route.js";
 import authRoutes from "./routes/auth.route.js";
 import availabilityRoutes from "./routes/availability.route.js";
@@ -27,7 +27,6 @@ import "./utils/passport.config.js";
 
 dotenv.config();
 
-// Validate critical environment variables
 const requiredEnvVars = [
   "PORT",
   "CLIENT_URL",
@@ -47,17 +46,15 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
-const httpServer = http.createServer(app);
+const server = http.createServer(app);
 
-// CORS configuration
 const allowedOrigins = [
-  process.env.CLIENT_URL,
-  "http://localhost:5173",
-  "http://172.20.10.5",
-  "http://13.61.16.74",
   "https://needle360.online",
   "http://www.needle360.online",
   "https://www.needle360.online",
+  "http://localhost:5173",
+  "http://172.20.10.5",
+  "http://13.61.16.74",
   /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
   /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/,
   /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
@@ -86,7 +83,6 @@ app.use(
   })
 );
 
-// Parse JSON bodies (except for Stripe webhook)
 app.use((req, res, next) => {
   if (req.originalUrl === "/api/webhook/stripe") {
     next();
@@ -97,84 +93,38 @@ app.use((req, res, next) => {
 
 app.use(cookieParser());
 
-// Session middleware
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production",
+      secure: false, // Set to false for local testing; ensure HTTPS in production
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
   })
 );
 
-// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Socket.IO initialization
-export const io = new Server(httpServer, {
-  cors: {
-    origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.some((allowed) =>
-          typeof allowed === "string"
-            ? allowed === origin
-            : allowed.test(origin)
-        )
-      ) {
-        callback(null, true);
-      } else {
-        console.warn(`Blocked CORS request from origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+const io = initializeSocketServer(server);
+app.set("io", io); // Attach io to the app for use in routes
 
-app.set("io", io);
-
-// Socket.IO event handling
-io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
-
-  socket.on("joinConversation", (conversationId) => {
-    console.log(`Socket ${socket.id} joining conversation: ${conversationId}`);
-    socket.join(conversationId);
-  });
-
-  socket.on("leaveConversation", (conversationId) => {
-    console.log(`Socket ${socket.id} leaving conversation: ${conversationId}`);
-    socket.leave(conversationId);
-  });
-
-  socket.on("joinRoom", ({ userId, role }) => {
-    const room = `${role}:${userId}`;
-    socket.join(room);
-    console.log(`${role} ${userId} joined room: ${room}`);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Client disconnected:", socket.id);
-  });
+app.use((req, res, next) => {
+  req.io = io;
+  next();
 });
 
 const port = process.env.PORT || 4000;
 
-// Parse raw bodies for Stripe webhook
 app.use(
   "/api/webhook/stripe",
   express.raw({ type: "application/json" }),
   handleStripeWebhook
 );
 
-// Connect MongoDB and start server
 connectToMongoDB()
   .then(() => {
     app.use("/api/auth", authRoutes);
@@ -193,7 +143,6 @@ connectToMongoDB()
     app.use("/api/order", orderRoutes);
     app.use("/api/mailtrap-webhook", webhookRoutes);
 
-    // API health check
     app.get("/api", (req, res) => {
       res.json({ message: "API server is up and running" });
     });
@@ -206,8 +155,7 @@ connectToMongoDB()
       });
     });
 
-    // Start the server
-    httpServer.listen(port, "0.0.0.0", () => {
+    server.listen(port, "0.0.0.0", () => {
       console.log(`Backend server is running on port ${port}`);
     });
   })

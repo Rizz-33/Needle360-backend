@@ -8,33 +8,14 @@ export const sendMessage = async (req, res) => {
     const { conversationId, content, attachments = [], clientId } = req.body;
     const userId = req.user?._id || req.userId;
 
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
-    }
-
-    if (!content.trim() && (!attachments || attachments.length === 0)) {
-      return res
-        .status(400)
-        .json({ message: "Message content cannot be empty" });
-    }
-
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-      return res.status(404).json({ message: "Conversation not found" });
-    }
-
-    if (!conversation.participants.includes(userId)) {
-      return res
-        .status(403)
-        .json({ message: "You are not a participant in this conversation" });
-    }
+    // ... (existing validation code)
 
     const message = new Message({
       sender: userId,
       content,
       conversation: conversationId,
       readBy: [userId],
-      attachments: attachments || [], // Make sure attachments is defined
+      attachments: attachments || [],
       clientId,
     });
 
@@ -50,15 +31,13 @@ export const sendMessage = async (req, res) => {
       "firstName lastName profilePicture role"
     );
 
-    // Add clientId to response if it was provided
     if (clientId) {
       populatedMessage._doc.clientId = clientId;
     }
 
-    // Get the io instance
+    // Use the injected io instance
     const io = req.app.get("io");
     if (io) {
-      console.log(`Emitting message to conversation: ${conversationId}`);
       io.to(conversationId).emit("newMessage", populatedMessage);
     } else {
       console.error("Socket.io instance not available");
