@@ -397,6 +397,7 @@ export const login = async (req, res) => {
   try {
     const db = mongoose.connection.db;
     const user = await db.collection("users").findOne({ email });
+
     if (!user) {
       return res.status(400).json({
         success: false,
@@ -414,22 +415,32 @@ export const login = async (req, res) => {
       });
     }
 
+    // Fix: Check if user._id exists before passing to generateTokenAndSetCookie
+    if (!user._id) {
+      return res.status(500).json({
+        success: false,
+        message: "User ID not found. Please contact support.",
+        source: "login",
+      });
+    }
+
     const token = generateTokenAndSetCookie(res, user._id);
 
+    // Fix: Add null checks for user properties
     const userResponse = {
       _id: user._id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      isVerified: user.isVerified,
-      isApproved: user.isApproved,
-      registrationNumber: user.registrationNumber,
-      contactNumber: user.contactNumber,
-      address: user.address,
-      shopName: user.shopName,
-      shopAddress: user.shopAddress,
-      shopRegistrationNumber: user.shopRegistrationNumber,
-      logoUrl: user.logoUrl,
+      email: user.email || "",
+      name: user.name || "",
+      role: user.role || "",
+      isVerified: user.isVerified || false,
+      isApproved: user.isApproved || false,
+      registrationNumber: user.registrationNumber || "",
+      contactNumber: user.contactNumber || "",
+      address: user.address || "",
+      shopName: user.shopName || "",
+      shopAddress: user.shopAddress || "",
+      shopRegistrationNumber: user.shopRegistrationNumber || "",
+      logoUrl: user.logoUrl || "",
     };
 
     res.status(200).json({
@@ -441,11 +452,13 @@ export const login = async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error.message);
+    console.error("Full error:", error); // Add full error logging
+
     res.status(500).json({
       success: false,
       message: "Something went wrong during login. Please try again later.",
       source: "login",
-      error: error.message,
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };
