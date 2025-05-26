@@ -154,7 +154,7 @@ connectToMongoDB()
     app.use("/api/order", orderRoutes);
     app.use("/api/mailtrap-webhook", webhookRoutes);
 
-    appSELL.get("/api", (req, res) => {
+    app.get("/api", (req, res) => {
       res.json({ message: "API server is up and running" });
     });
 
