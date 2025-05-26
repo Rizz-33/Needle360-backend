@@ -83,6 +83,17 @@ app.use(
   })
 );
 
+// Add express.static middleware to serve static files from the 'public' directory
+app.use(
+  express.static("public", {
+    setHeaders: (res, path) => {
+      if (path.endsWith(".webmanifest")) {
+        res.setHeader("Content-Type", "application/manifest+json");
+      }
+    },
+  })
+);
+
 app.use((req, res, next) => {
   if (req.originalUrl === "/api/webhook/stripe") {
     next();
@@ -143,7 +154,7 @@ connectToMongoDB()
     app.use("/api/order", orderRoutes);
     app.use("/api/mailtrap-webhook", webhookRoutes);
 
-    app.get("/api", (req, res) => {
+    appSELL.get("/api", (req, res) => {
       res.json({ message: "API server is up and running" });
     });
 
