@@ -27,23 +27,23 @@ import "./utils/passport.config.js";
 
 dotenv.config();
 
-const requiredEnvVars = [
-  "PORT",
-  "CLIENT_URL",
-  "MONGODB_PASSWORD",
-  "STRIPE_SECRET_KEY",
-  "JWT_SECRET",
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "SESSION_SECRET",
-];
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
-);
-if (missingEnvVars.length > 0) {
-  console.error(`Missing environment variables: ${missingEnvVars.join(", ")}`);
-  process.exit(1);
-}
+// const requiredEnvVars = [
+//   "PORT",
+//   "CLIENT_URL",
+//   "MONGODB_PASSWORD",
+//   "STRIPE_SECRET_KEY",
+//   "JWT_SECRET",
+//   "GOOGLE_CLIENT_ID",
+//   "GOOGLE_CLIENT_SECRET",
+//   "SESSION_SECRET",
+// ];
+// const missingEnvVars = requiredEnvVars.filter(
+//   (varName) => !process.env[varName]
+// );
+// if (missingEnvVars.length > 0) {
+//   console.error(`Missing environment variables: ${missingEnvVars.join(", ")}`);
+//   process.exit(1);
+// }
 
 const app = express();
 const server = http.createServer(app);
@@ -80,6 +80,17 @@ app.use(
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+  })
+);
+
+// Add express.static middleware to serve static files from the 'public' directory
+app.use(
+  express.static("public", {
+    setHeaders: (res, path) => {
+      if (path.endsWith(".webmanifest")) {
+        res.setHeader("Content-Type", "application/manifest+json");
+      }
+    },
   })
 );
 
