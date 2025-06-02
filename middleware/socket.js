@@ -42,6 +42,15 @@ const initializeSocketServer = (server) => {
     },
   });
 
+  // Add this to your existing backend socket.js
+  io.engine.on("connection_error", (err) => {
+    console.error("Socket.IO engine connection error:", err);
+  });
+
+  // Add ping timeout configuration
+  io.engine.opts.pingTimeout = 60000;
+  io.engine.opts.pingInterval = 25000;
+
   io.use(async (socket, next) => {
     try {
       const token =
