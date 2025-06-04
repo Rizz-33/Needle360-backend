@@ -16,6 +16,7 @@ const initializeSocketServer = (server) => {
   ].filter(Boolean);
 
   const io = new Server(server, {
+    path: "/socket.io",
     cors: {
       origin: (origin, callback) => {
         if (
@@ -28,28 +29,31 @@ const initializeSocketServer = (server) => {
         ) {
           callback(null, true);
         } else {
-          console.warn(`Blocked Socket.IO CORS request from origin: ${origin}`);
+          console.warn(
+            `Socket.IO Server: Blocked CORS request from origin: ${origin}`
+          );
           callback(new Error("Not allowed by CORS"));
         }
       },
       methods: ["GET", "POST"],
       credentials: true,
     },
-    transports: ["websocket", "polling"],
+    transports: ["websocket", "polling"], // Explicitly support both transports
+    pingTimeout: 60000,
+    pingInterval: 25000,
     connectionStateRecovery: {
       maxDisconnectionDuration: 2 * 60 * 1000,
       skipMiddlewares: true,
     },
   });
 
-  // Add this to your existing backend socket.js
   io.engine.on("connection_error", (err) => {
-    console.error("Socket.IO engine connection error:", err);
+    console.error("Socket.IO Server: Connection error:", {
+      message: err.message,
+      context: err.context,
+      stack: err.stack,
+    });
   });
-
-  // Add ping timeout configuration
-  io.engine.opts.pingTimeout = 60000;
-  io.engine.opts.pingInterval = 25000;
 
   io.use(async (socket, next) => {
     try {
@@ -57,7 +61,7 @@ const initializeSocketServer = (server) => {
         socket.handshake.auth.token ||
         socket.handshake.headers.authorization?.split(" ")[1];
       if (!token) {
-        console.error("Socket.IO: No token provided");
+        console.error("Socket.IO Server: No token provided");
         return next(new Error("Authentication error: No token provided"));
       }
 
@@ -65,7 +69,7 @@ const initializeSocketServer = (server) => {
       try {
         decoded = jwt.verify(token, process.env.JWT_SECRET);
       } catch (err) {
-        console.error(`Socket.IO: Invalid token - ${err.message}`);
+        console.error(`Socket.IO Server: Invalid token - ${err.message}`);
         return next(
           new Error(`Authentication error: Invalid or expired token`)
         );
@@ -73,7 +77,7 @@ const initializeSocketServer = (server) => {
 
       const userId = decoded.userId || decoded.id || decoded._id;
       if (!userId) {
-        console.error("Socket.IO: No user ID in token");
+        console.error("Socket.IO Server: No user ID in token");
         return next(
           new Error("Authentication error: User ID not found in token")
         );
@@ -81,43 +85,46 @@ const initializeSocketServer = (server) => {
 
       const user = await BaseUser.findById(userId).select("-password").lean();
       if (!user) {
-        console.error(`Socket.IO: User not found for ID ${userId}`);
+        console.error(`Socket.IO Server: User not found for ID ${userId}`);
         return next(new Error("Authentication error: User not found"));
       }
 
       socket.user = user;
-      console.log(`Socket.IO: Authenticated user ${user._id}`);
+      console.log(`Socket.IO Server: Authenticated user ${user._id}`);
       next();
     } catch (error) {
-      console.error(`Socket.IO middleware error: ${error.message}`);
+      console.error(`Socket.IO Server: Middleware error: ${error.message}`);
       next(new Error(`Authentication error: ${error.message}`));
     }
   });
 
   io.on("connection", (socket) => {
-    console.log(`Socket.IO: User connected ${socket.user._id}`);
+    console.log(`Socket.IO Server: User connected ${socket.user._id}`);
     socket.join(socket.user._id.toString());
 
     socket.on("joinConversation", (conversationId) => {
       socket.join(conversationId);
       console.log(
-        `Socket.IO: User ${socket.user._id} joined conversation ${conversationId}`
+        `Socket.IO Server: User ${socket.user._id} joined conversation ${conversationId}`
       );
     });
 
     socket.on("leaveConversation", (conversationId) => {
       socket.leave(conversationId);
       console.log(
-        `Socket.IO: User ${socket.user._id} left conversation ${conversationId}`
+        `Socket.IO Server: User ${socket.user._id} left conversation ${conversationId}`
       );
     });
 
     socket.on("newMessage", async (message) => {
       try {
+        console.log(
+          `Socket.IO Server: Broadcasting new message to conversation ${message.conversation}`
+        );
         io.to(message.conversation).emit("newMessage", message);
       } catch (error) {
         console.error(
-          `Socket.IO: Error broadcasting message - ${error.message}`
+          `Socket.IO Server: Error broadcasting message - ${error.message}`
         );
         socket.emit("error", `Failed to broadcast message: ${error.message}`);
       }
@@ -125,6 +132,9 @@ const initializeSocketServer = (server) => {
 
     socket.on("markMessagesAsRead", async ({ conversationId, messageIds }) => {
       try {
+        console.log(
+          `Socket.IO Server: Broadcasting messages read for conversation ${conversationId}`
+        );
         io.to(conversationId).emit("messagesRead", {
           conversationId,
           readBy: socket.user._id,
@@ -132,7 +142,7 @@ const initializeSocketServer = (server) => {
         });
       } catch (error) {
         console.error(
-          `Socket.IO: Error broadcasting read status - ${error.message}`
+          `Socket.IO Server: Error broadcasting read status - ${error.message}`
         );
         socket.emit(
           "error",
@@ -142,11 +152,11 @@ const initializeSocketServer = (server) => {
     });
 
     socket.on("disconnect", () => {
-      console.log(`Socket.IO: User disconnected ${socket.user._id}`);
+      console.log(`Socket.IO Server: User disconnected ${socket.user._id}`);
     });
 
     socket.on("error", (error) => {
-      console.error(`Socket.IO: Client error - ${error.message}`);
+      console.error(`Socket.IO Server: Client error - ${error.message}`);
     });
   });
 
