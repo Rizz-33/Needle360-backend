@@ -27,24 +27,6 @@ import "./utils/passport.config.js";
 
 dotenv.config();
 
-// const requiredEnvVars = [
-//   "PORT",
-//   "CLIENT_URL",
-//   "MONGODB_PASSWORD",
-//   "STRIPE_SECRET_KEY",
-//   "JWT_SECRET",
-//   "GOOGLE_CLIENT_ID",
-//   "GOOGLE_CLIENT_SECRET",
-//   "SESSION_SECRET",
-// ];
-// const missingEnvVars = requiredEnvVars.filter(
-//   (varName) => !process.env[varName]
-// );
-// if (missingEnvVars.length > 0) {
-//   console.error(`Missing environment variables: ${missingEnvVars.join(", ")}`);
-//   process.exit(1);
-// }
-
 const app = express();
 const server = http.createServer(app);
 
@@ -73,7 +55,7 @@ app.use(
       ) {
         callback(null, true);
       } else {
-        console.warn(`Blocked CORS request from origin: ${origin}`);
+        console.warn(`Express: Blocked CORS request from origin: ${origin}`);
         callback(new Error("Not allowed by CORS"));
       }
     },
@@ -83,7 +65,6 @@ app.use(
   })
 );
 
-// Add express.static middleware to serve static files from the 'public' directory
 app.use(
   express.static("public", {
     setHeaders: (res, path) => {
@@ -110,7 +91,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // Set to false for local testing; ensure HTTPS in production
+      secure: process.env.NODE_ENV === "production", // Use secure cookies in production
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
@@ -121,7 +102,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 const io = initializeSocketServer(server);
-app.set("io", io); // Attach io to the app for use in routes
+app.set("io", io);
+console.log("Express: Socket.IO server initialized");
 
 app.use((req, res, next) => {
   req.io = io;
@@ -167,10 +149,13 @@ connectToMongoDB()
     });
 
     server.listen(port, "0.0.0.0", () => {
-      console.log(`Backend server is running on port ${port}`);
+      console.log(`Express: Backend server is running on port ${port}`);
     });
   })
   .catch((error) => {
-    console.error("Failed to connect to MongoDB. Server not started.", error);
+    console.error(
+      "Express: Failed to connect to MongoDB. Server not started.",
+      error
+    );
     process.exit(1);
   });
