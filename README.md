@@ -176,22 +176,35 @@ The backend is structured as a set of microservices that can be deployed togethe
 
 ```
 needle360-backend/
-├── services/
-│   ├── auth-service/         # User authentication and authorization
-│   ├── admin-service/        # Admin functionalities
-│   ├── customer-service/     # Customer functionalities
-│   ├── tailor-service/       # Tailor functionalities
-│   ├── order-service/        # Order management
-│   ├── inventory-service/    # Inventory management
-│   ├── design-service/       # Design collaboration
-│   ├── message-service/      # In-app messaging
-│   ├── appointment-service/  # Scheduling
+├── controllers/                     # Business logic layer
+│   ├── auth.controller/             # Authentication (JWT, sessions)
+│   ├── admin.controller/            # Admin operations
+│   ├── customer.controller/         # Customer-related logic
+│   ├── tailor.controller/           # Tailor functionalities
+│   ├── order.controller/            # Order processing
+│   ├── inventory.controller/        # Stock & product management
+│   ├── design.controller/           # Custom design handling
+│   ├── message.controller/          # Internal messaging system
+│   ├── payment.controller/          # Stripe or other payments
 │   └── ...
-├── shared/                   # Shared utilities and middleware
-│   ├── middleware/
-│   ├── utils/
-│   └── models/
-└── gateway/                  # API Gateway
+├── routes/                          # Express route definitions
+│   ├── auth.routes.js
+│   ├── order.routes.js
+│   ├── ...
+├── middleware/                      # Global middleware (auth, error handlers)
+│   ├── auth.js
+│   ├── socket.js
+│   └── ...
+├── utils/                           # Helper functions (e.g., sendEmail, validators)
+│   ├── passport.config.js
+│   ├── generateTokenAndSetCookie.js
+│   └── ...
+├── models/                          # Mongoose schemas/models
+│   ├── User.model.js
+│   ├── Order.model.js
+│   └── ...
+└── app.js               # Main entry point (Express config)
+
 ```
 
 ## Contributing
@@ -206,13 +219,10 @@ We welcome contributions from the community! Follow these steps to contribute:
 
 ## Roadmap
 
-- ✅ Basic API & Authentication
+- ✅ API & Authentication
 - ✅ Order & Payment Processing
 - ✅ Core Service Implementation
-- ⏳ AI-based Design Recommendation Engine (Upcoming)
 - ⏳ Enhanced Analytics Services (Upcoming)
-- ⏳ Real-time Notifications (Upcoming)
-- ⏳ API Performance Optimization (Upcoming)
 
 ## License
 
@@ -223,7 +233,7 @@ This project is licensed under the [MIT License](LICENSE).
 For any queries, feel free to reach out:
 
 - **GitHub**: [@Rizz-33](https://github.com/Rizz-33)
-- **Email**: TBD
+- **Email**: aarruwanthie@gmail.com
 
 ---
 
