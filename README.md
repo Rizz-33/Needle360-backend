@@ -118,35 +118,40 @@ The API server will be available at `http://localhost:4000` by default.
 Create a `.env` file in the root directory with the following variables:
 
 ```
-# Server Configuration
-PORT=5000
+MONGODB_CONNECTION_STRING="mongodb://localhost:27017/needle360"
+MONGODB_PASSWORD=your_mongodb_password
+
+# Example URI
+# MONGODB_URI=mongodb+srv://username:password@clustername.mongodb.net/database?retryWrites=true&w=majority
+
+port=4000
+
+JWT_SECRET=your_jwt_secret
+JWT_EXPIRES_IN=1d
+
 NODE_ENV=development
 
-# MongoDB
-MONGODB_URI=your_mongodb_connection_string
+MAILTRAP_ENDPOINT=https://send.api.mailtrap.io
+MAILTRAP_TOKEN=your_mailtrap_token
+MAILTRAP_WEBHOOK_SECRET=your_mailtrap_webhook_secret
+MAILTRAP_WEBHOOK_URL=http://needle360.online:4000/api/mailtrap-webhook
 
-# Redis
-REDIS_URL=your_redis_url
+CLIENT_URL=http://13.61.16.74:5173
+API_URL=http://localhost:5173
 
-# JWT Authentication
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRY=24h
+CLOUD_NAME=your_cloudinary_cloud_name
+CLOUD_API_KEY=your_cloudinary_api_key
+CLOUD_API_SECRET=your_cloudinary_api_secret
 
-# External Services
-STRIPE_API_KEY=your_stripe_key
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
 STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
 
-CLOUDINARY_CLOUD_NAME=your_cloud_name
-CLOUDINARY_API_KEY=your_api_key
-CLOUDINARY_API_SECRET=your_api_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
 
-MAILTRAP_HOST=smtp.mailtrap.io
-MAILTRAP_PORT=2525
-MAILTRAP_USER=your_mailtrap_user
-MAILTRAP_PASS=your_mailtrap_password
+SESSION_SECRET=your_session_secret
 
-# CORS
-FRONTEND_URL=http://localhost:5173
 ```
 
 ### API Documentation
