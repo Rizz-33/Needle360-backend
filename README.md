@@ -12,6 +12,9 @@ This repository contains the backend services for **needle360**, a web-based e-c
 
 This project aims to revolutionize the tailor industry by providing a one-stop digital solution for custom apparel shopping and order management.
 
+- frontend : [https://github.com/Rizz-33/Needle360-frontend](https://github.com/Rizz-33/Needle360-frontend)
+- backend : [https://github.com/Rizz-33/Needle360-backend](https://github.com/Rizz-33/Needle360-backend)
+
 ## System Architecture
 
 needle360 follows a layered architecture to ensure scalability and maintainability:
