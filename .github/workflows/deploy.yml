@@ -9,18 +9,16 @@ on:
       - main
 
 jobs:
-  build:
+  # Test build job - runs on both PR and main push
+  test-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Validate Environment Variables
         run: |
           if [ -z "${{ secrets.STRIPE_SECRET_KEY }}" ]; then
@@ -35,6 +33,34 @@ jobs:
             echo "Error: STRIPE_PUBLISHABLE_KEY is not set"
             exit 1
           fi
+
+      - name: Test Docker Build (without push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: rizz336/needle360-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build and push job - only runs on main branch push
+  build:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: test-build
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v6
         with:
@@ -44,9 +70,11 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # Deploy job - only runs on main branch push after successful build
   deploy:
     needs: build
     runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Clean Up Docker Environment
         run: |
@@ -56,14 +84,19 @@ jobs:
           rm -rf /root/.npm/_cacache || true
           df -h
         continue-on-error: true
+
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
+
       - name: Stop Existing Container
         run: docker stop needle360-backend-container || true
+
       - name: Remove Existing Container
         run: docker rm needle360-backend-container || true
+
       - name: Create or Join Docker Network
         run: docker network create needle360-network || true
+
       - name: Start MongoDB Container
         run: |
           docker run -d \
@@ -72,6 +105,7 @@ jobs:
             --network needle360-network \
             -v mongodb_data:/data/db \
             mongo:latest || true
+
       - name: Run Docker Container
         run: |
           docker run -d \
@@ -95,11 +129,13 @@ jobs:
             -e SESSION_SECRET='${{ secrets.SESSION_SECRET }}' \
             --restart unless-stopped \
             rizz336/needle360-backend:latest
+
       - name: Verify Container Running
         run: |
           sleep 10
           docker ps -a
           docker logs needle360-backend-container
+
       - name: Wait for backend to be ready
         run: |
           echo "Waiting for backend to be ready..."
