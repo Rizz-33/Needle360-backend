@@ -22,7 +22,7 @@ const EMAIL_SIGNATURE = `
           <p style="margin: 0; font-weight: bold; font-size: 16px; color: ${COLORS.accent};">needle360°</p>
           <p style="margin: 5px 0 0; font-size: 13px; color: #666;">Your All-in-One Business Solution</p>
           <p style="margin: 5px 0 0; font-size: 12px; color: #666;">
-            <a href="https://www.needle360.com" style="color: ${COLORS.primary}; text-decoration: none;">www.needle360.com</a> | 
+            <a href="https://www.needle360.online" style="color: ${COLORS.primary}; text-decoration: none;">www.needle360.online</a> | 
             <a href="mailto:needle360.online@gmail.com" style="color: ${COLORS.primary}; text-decoration: none;">support@needle360.com</a>
           </p>
         </td>
