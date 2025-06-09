@@ -85,17 +85,18 @@ jobs:
           df -h
         continue-on-error: true
 
+      - name: Create or Join Docker Network
+        run: docker network create needle360-network || true
+
       - name: Pull Docker Image
         run: docker pull rizz336/needle360-backend:latest
 
-      - name: Stop Existing Container
-        run: docker stop needle360-backend-container || true
-
-      - name: Remove Existing Container
-        run: docker rm needle360-backend-container || true
-
-      - name: Create or Join Docker Network
-        run: docker network create needle360-network || true
+      - name: Stop and Remove Existing Containers
+        run: |
+          docker stop needle360-backend-container || true
+          docker rm needle360-backend-container || true
+          docker stop mongo-container || true
+          docker rm mongo-container || true
 
       - name: Start MongoDB Container
         run: |
@@ -104,9 +105,21 @@ jobs:
             --restart unless-stopped \
             --network needle360-network \
             -v mongodb_data:/data/db \
-            mongo:latest || true
+            mongo:latest
 
-      - name: Run Docker Container
+      - name: Wait for MongoDB to be ready
+        run: |
+          echo "Waiting for MongoDB to be ready..."
+          for i in {1..30}; do
+            if docker exec mongo-container mongosh --eval "db.adminCommand('ping')" >/dev/null 2>&1; then
+              echo "MongoDB is ready"
+              break
+            fi
+            echo "Attempt $i: MongoDB not ready yet"
+            sleep 2
+          done
+
+      - name: Run Backend Container
         run: |
           docker run -d \
             -p 4000:4000 \
@@ -130,24 +143,18 @@ jobs:
             --restart unless-stopped \
             rizz336/needle360-backend:latest
 
-      - name: Verify Container Running
-        run: |
-          sleep 10
-          docker ps -a
-          docker logs needle360-backend-container
-
       - name: Wait for backend to be ready
         run: |
           echo "Waiting for backend to be ready..."
-          for i in {1..10}; do
-            if curl -s -f http://needle360.online:4000 >/dev/null; then
+          for i in {1..30}; do
+            if curl -s -f http://localhost:4000/health || curl -s -f http://localhost:4000 >/dev/null; then
               echo "Backend is ready"
               exit 0
             fi
             echo "Attempt $i: Backend not ready yet"
-            docker logs needle360-backend-container
+            docker logs --tail 10 needle360-backend-container
             sleep 5
           done
-          echo "Backend did not become ready after 10 attempts"
+          echo "Backend did not become ready after 30 attempts"
           docker logs needle360-backend-container
           exit 1
